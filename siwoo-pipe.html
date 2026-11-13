@@ -196,6 +196,7 @@ const AU={c:null,mode:'title',step:0,next:0,T:0.3,tr:0,loops:0,
   chirp(t,v,dest){for(let k=0;k<2;k++){const tt=t+k*0.11;this.tone(rnd(1700,2000),0.12,'sine',v,rnd(2500,2900),tt,dest||this.mus);}},
   pump(){if(!this.c)return;const t=this.c.currentTime;this.tone(70,1.0,'sawtooth',0.12,180,t);this.noise(1.0,0.2,'lowpass',600,t,this.sfx);this.tone(900,0.15,'sine',0.08,1200,t+0.9);},
   launch(){if(!this.c)return;const t=this.c.currentTime;this.noise(3.5,0.5,'lowpass',260,t+0.3,this.sfx,0.7);this.tone(55,3.2,'sawtooth',0.18,35,t+0.4);this.noise(2.5,0.25,'bandpass',900,t+1,this.sfx,0.5);},
+  hurry(){if(!this.c)return;const t=this.c.currentTime;[[72,0],[76,0.09],[79,0.18],[84,0.27],[84,0.45]].forEach(([n,d])=>this.brass(mf(n),0.12,t+d,0.12));this.sirenChop(mf(84),0.35,t+0.45,0.08);},
   faucet(){if(!this.c)return;const t=this.c.currentTime;this.tone(700,0.28,'sine',0.1,1300,t);this.noise(0.9,0.28,'bandpass',500,t+0.2,this.sfx,1.5);this.tone(260,0.35,'sine',0.12,150,t+0.25);},
   // ===== 우주 음악 전용 =====
   cosmicStep(i,t,pat,st,T,ch,tr,s,bar){
@@ -912,7 +913,7 @@ const CONCEPTS=[
    pipe:{rim:'#0e1220',dark:'#3a4466',body:'#8fa0c8',hi:'#e0e8ff',channel:'#141a2c',flange:'#ff9a2a',water:'#5dff3a',waterHi:'#eaffd0'},
    tileA:'#1d2138',tileB:'#191c31',frame:'#8c6bff',startLabel:'연료',goalLabel:'로켓',music:'space',crossRule:true,crossEvery:5,
    startCol:['#ffd27a','#e07a10'],goalFill:'#e8ecff',goalStroke:'#5a4cff',goalText:'#3a2c9a',goalIcon:'🚀',
-   countLabel:'연료 나오기까지',pathWord:'연료길',sendLabel:'⛽ 연료 보내기',
+   countLabel:'연료 나오기까지',pathWord:'연료길',fluidSubj:'연료가',sendLabel:'⛽ 연료 보내기',
    introShort:'🚀 로켓에 연료를 넣어요!',goBtn:'⛽ 주유 시작!',startSfx:()=>AU.pump(),
    winTitle:'🚀 발사 성공!',winLine:'카피바라가 우주로 갔어요!',loseTitle:'⛽ 앗! 연료가 샜어요',loseLine:'다시 연료를 넣어 봐요!',
    flowMsg:'⛽ 연료가 가고 있어요!',saveMsg:'🔥 점화! 3, 2, 1…',
@@ -972,7 +973,7 @@ function startLevel(n){
   const cfg=levelCfg(n);G.level=n;G.cfg=cfg;G.levelStartScore=G.score;
   G.req=0;genLevel(cfg);if(!G.req)G.req=G.minLen;
   G.queue=[];for(let i=0;i<5;i++)G.queue.push(newPiece());
-  Object.assign(G,{crosses:0,crossReq:cfg.crossReq||0,phase:'ready',countdown:cfg.countdown,tileTime:cfg.tileTime,flow:null,fast:false,elapsed:0,replaces:0,pathLen:0,resultT:0,fx:[],floats:[],qShift:0,lock:0,lockMax:1,pending:[],lastTick:99,stars:0});
+  Object.assign(G,{flowT:0,hurry:0,hurryShow:0,crosses:0,crossReq:cfg.crossReq||0,phase:'ready',countdown:cfg.countdown,tileTime:cfg.tileTime,flow:null,fast:false,elapsed:0,replaces:0,pathLen:0,resultT:0,fx:[],floats:[],qShift:0,lock:0,lockMax:1,pending:[],lastTick:99,stars:0});
   G.dangerT=Math.min(cfg.countdown,90)+cfg.tileTime*(cfg.minDist+4);
   G.concept.scene.reset();AU.setMusic(G.concept.music||'play');
 }
@@ -1011,7 +1012,8 @@ function startFlow(){
 }
 function updateFlow(dt){
   let f=G.flow;if(!f)return;
-  f.p+=dt*(G.fast?8:1)/G.tileTime/f.frac;
+  const slow=2.2,boost=Math.min(4,1+0.4*G.hurry),fast=G.fast?8*slow/boost:1;
+  f.p+=dt*fast/(G.tileTime*slow/boost)/f.frac;
   while(f.p>=1){
     const over=(f.p-1)*f.frac;f.p=1;
     if(f.to===-1){win();return;}
@@ -1156,7 +1158,7 @@ function drawHUD(){
     const cx=s.x+s.w/2,cy=s.y+s.h*0.5,col=urgent?'#ff4a3a':'#ffffff';
     txt(G.concept.countLabel||'물 나오기까지',cx,cy-Math.min(s.h*0.42,s.w*0.3)*0.62,Math.max(13,s.h*0.07),'#bfefff',{font:FT,stroke:'rgba(0,0,0,0.75)',sw:5});
     txt(String(sec),cx,cy+Math.min(s.h*0.42,s.w*0.3)*0.08,big,col,{font:FT,stroke:'rgba(0,0,0,0.8)',sw:big*0.1,glow:urgent?'#ff2a00':'#5cc8ff',blur:24});
-  }else if(G.phase==='flow'){pill(s.x+10,y2,G.concept.flowMsg,fs,'#7fd8ff');y3=y2+ph+8;}
+  }else if(G.phase==='flow'){pill(s.x+10,y2,G.concept.flowMsg+(G.hurry?' '+'⚡'.repeat(Math.min(G.hurry,3)):''),fs,G.hurry?'#ffd23a':'#7fd8ff');y3=y2+ph+8;}
   else if(G.phase==='saving'){pill(s.x+10,y2,G.concept.saveMsg,fs*1.1,'#ffe14d');y3=y2+ph+8;}
   const okp=G.pathLen>=G.req;
   const ph3=pill(s.x+10,y3,okp?`🔧 ${G.pathLen}/${G.req} 완료!`:`🔧 파이프 ${G.pathLen}/${G.req}`,fs,okp?'#5dff8a':'#ffd54a');
@@ -1287,6 +1289,14 @@ function drawPlay(){
   drawHUD();drawQueue();drawGrid();drawFx();
   ctx.restore();
   drawBar();drawOverlay();
+  if(G.hurryShow>0&&G.phase==='flow'){
+    const s=LAY.scene,a=Math.min(1,G.hurryShow/0.4),age=2.4-G.hurryShow,pop=age<0.25?0.6+1.6*age:1+0.06*Math.sin(G.time*14);
+    ctx.font=`100px ${FT}`;const fit=s.w*0.9/ctx.measureText('⚡ HURRY UP! ⚡').width*100;
+    const big=Math.min(s.h*0.24,fit)*pop,cx=s.x+s.w/2,cy=s.y+s.h*0.42,flash=Math.sin(G.time*20)>0;
+    ctx.save();ctx.globalAlpha=a*0.35;ctx.fillStyle='#000';ctx.fillRect(s.x,cy-big*0.95,s.w,big*1.9);ctx.restore();
+    txt('⚡ HURRY UP! ⚡',cx,cy,big,flash?'#ffe14d':'#ff5a3a',{font:FT,stroke:'#000',sw:big*0.14,glow:'#ff3000',blur:22,alpha:a});
+    txt(`${G.concept.fluidSubj||'물이'} 빨라져요!`,cx,cy+big*0.75,Math.max(14,big*0.38),'#ffffff',{font:FT,stroke:'#000',sw:5,alpha:a});
+  }
 }
 function drawCard(cp,x,y,w,h,row){
   const pulse=0.5+0.5*Math.sin(G.time*4);
@@ -1353,7 +1363,10 @@ function update(dt){
     G.countdown-=dt;G.elapsed+=dt;}const sec=Math.ceil(G.countdown);
     if(sec<=5&&sec>0&&sec!==G.lastTick){G.lastTick=sec;AU.tick(sec);}
     if(G.countdown<=0)startFlow();
-  }else if(ph==='flow'){G.elapsed+=dt*(G.fast?2:1);updateFlow(dt);}
+  }else if(ph==='flow'){G.elapsed+=dt*(G.fast?2:1);G.flowT+=dt;
+    const hl=Math.floor(G.flowT/15);if(hl>G.hurry&&!G.fast){G.hurry=hl;G.hurryShow=2.4;AU.hurry();G.shake=0.25;}
+    updateFlow(dt);}
+  if(G.hurryShow>0)G.hurryShow-=dt;
   else if(ph==='leak'){
     G.resultT+=dt;const f=G.leakSeg;
     if(f){const s=LAY.grid.cell,[x,y]=cellXY(f.r,f.c),pt=sidePt(x,y,s,f.to),d=f.to;
