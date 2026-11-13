@@ -946,8 +946,29 @@ function longPathOk(grid,so,gi,req){
   for(let k=0;k<3;k++){steps=0;vis.clear();if(dfs(so[0],so[1],1))return true;}
   return false;
 }
+/* 판 만들기: "정답 길"을 먼저 정하고 → 그 길 위 직선 칸에 화살표 파이프를 길 방향대로 박고 → 장애물은 길 밖에만.
+   그래서 최소 파이프 수·크로스 수·화살표 통과 조건을 모두 만족하는 길이 항상 최소 1개 존재함 */
+function findSolution(grid,st,gl,so,gi,req,needStraight){
+  let steps=0;const vis=new Set(),path=[];
+  const md=(r,c)=>Math.abs(r-gi[0])+Math.abs(c-gi[1]),maxLen=req+10;
+  const straightCount=()=>{const full=[[st.r,st.c],...path,[gl.r,gl.c]];let k=0;
+    for(let i=1;i<full.length-1;i++){const a=full[i-1],b=full[i],c=full[i+1];if(a[0]-b[0]===b[0]-c[0]&&a[1]-b[1]===b[1]-c[1])k++;}return k;};
+  function dfs(r,c){
+    if(++steps>60000)return false;
+    path.push([r,c]);vis.add(r*COLS+c);
+    if(r===gi[0]&&c===gi[1]){if(path.length>=req&&straightCount()>=needStraight)return true;}
+    else if(path.length+md(r,c)<=maxLen){
+      const ds=[0,1,2,3].sort(()=>Math.random()-0.5);
+      for(const d of ds){const nr=r+DY[d],nc=c+DX[d];
+        if(nr<0||nc<0||nr>=ROWS||nc>=COLS||vis.has(nr*COLS+nc)||grid[nr][nc].t)continue;
+        if(dfs(nr,nc))return true;}
+    }
+    path.pop();vis.delete(r*COLS+c);return false;
+  }
+  return dfs(so[0],so[1])?path.slice():null;
+}
 function genLevel(cfg,depth){
-  for(let tries=0;tries<400;tries++){
+  for(let tries=0;tries<300;tries++){
     const grid=[];for(let r=0;r<ROWS;r++){const row=[];for(let c=0;c<COLS;c++)row.push(emptyCell());grid.push(row);}
     let sr,sc,sd,gr,gc,gd;
     if(!cfg.freeDir){sc=0;sr=1+ri(ROWS-2);sd=E;gc=COLS-1;gr=ri(ROWS);gd=WW;}
@@ -959,26 +980,35 @@ function genLevel(cfg,depth){
     if((so[0]===gr&&so[1]===gc)||(gi[0]===sr&&gi[1]===sc))continue;
     if(Math.abs(so[0]-gi[0])+Math.abs(so[1]-gi[1])<cfg.minDist-1)continue;
     grid[sr][sc]={t:'S',dir:sd,fills:[],pt:0};grid[gr][gc]={t:'G',dir:gd,fills:[],pt:0};
-    const reserved=new Set([sr*COLS+sc,gr*COLS+gc,so[0]*COLS+so[1],gi[0]*COLS+gi[1]]);
-    {let m=cfg.oneWay||0,gd=0;
-     while(m>0&&gd++<300){const r=ri(ROWS),c=ri(COLS);if(reserved.has(r*COLS+c)||grid[r][c].t)continue;
-       const d=ri(4),ar=r+DY[d],ac=c+DX[d],br=r-DY[d],bc=c-DX[d];
-       if(!ok(ar,ac)||!ok(br,bc)||grid[ar][ac].t||grid[br][bc].t)continue;
-       grid[r][c]={t:'O',dir:d,fills:[],pt:0};m--;}}
-    let n=cfg.rocks,guard=0;
-    while(n>0&&guard++<300){const r=ri(ROWS),c=ri(COLS);if(reserved.has(r*COLS+c)||grid[r][c].t)continue;grid[r][c]={t:'R',dir:-1,fills:[],pt:0};n--;}
+    const st={r:sr,c:sc},gl={r:gr,c:gc};
     const d=bfs(grid,so,gi);if(d<0)continue;
-    const want=Math.max(d+1,cfg.target||0);let req=want+((want-(d+1))%2);
-    if(req>d+1&&!longPathOk(grid,so,gi,req))continue;
-    G.grid=grid;G.start={r:sr,c:sc,dir:sd};G.goal={r:gr,c:gc,dir:gd};G.minLen=d+1;G.req=req;return;
+    const want=Math.max(d+1,cfg.target||0),req=want+((want-(d+1))%2);
+    const nOne=cfg.oneWay||0,nCross=cfg.crossReq||0;
+    const path=findSolution(grid,st,gl,so,gi,req,nOne+nCross);
+    if(!path)continue;
+    // 정답 길의 직선 칸(진행 방향 포함) 목록
+    const full=[[sr,sc],...path,[gr,gc]],straight=[];
+    for(let i=2;i<full.length-2;i++){const a=full[i-1],b=full[i],c=full[i+1];
+      if(a[0]-b[0]===b[0]-c[0]&&a[1]-b[1]===b[1]-c[1]){const dr=c[0]-b[0],dc=c[1]-b[1];straight.push({i,r:b[0],c:b[1],dir:DY.findIndex((y,k)=>y===dr&&DX[k]===dc)});}}
+    if(straight.length<nOne+nCross)continue;
+    // 화살표 파이프: 직선 칸 중 서로 떨어진 곳에 길 방향대로
+    const pool=straight.slice().sort(()=>Math.random()-0.5),chosen=[];
+    for(const sc2 of pool){if(chosen.length>=nOne)break;if(chosen.some(x=>Math.abs(x.i-sc2.i)<3))continue;chosen.push(sc2);}
+    if(chosen.length<nOne)continue;
+    for(const o of chosen)grid[o.r][o.c]={t:'O',dir:o.dir,fills:[],pt:0};
+    // 장애물: 정답 길·출발/도착 칸이 아닌 곳에만
+    const onPath=new Set(full.map(([r,c])=>r*COLS+c));
+    let n=cfg.rocks,guard=0;
+    while(n>0&&guard++<400){const r=ri(ROWS),c=ri(COLS);if(onPath.has(r*COLS+c)||grid[r][c].t)continue;grid[r][c]={t:'R',dir:-1,fills:[],pt:0};n--;}
+    G.grid=grid;G.start={r:sr,c:sc,dir:sd};G.goal={r:gr,c:gc,dir:gd};G.minLen=d+1;G.req=req;G.oneWayTotal=chosen.length;G.solution=full;return;
   }
   if(!depth)genLevel(Object.assign({},cfg,{freeDir:false,rocks:0}),1);
 }
 function startLevel(n){
   const cfg=levelCfg(n);G.level=n;G.cfg=cfg;G.levelStartScore=G.score;
-  G.req=0;genLevel(cfg);if(!G.req)G.req=G.minLen;
+  G.req=0;G.oneWayTotal=0;genLevel(cfg);if(!G.req)G.req=G.minLen;
   G.queue=[];for(let i=0;i<5;i++)G.queue.push(newPiece());
-  Object.assign(G,{flowT:0,hurry:0,hurryShow:0,crosses:0,crossReq:cfg.crossReq||0,phase:'ready',countdown:cfg.countdown,tileTime:cfg.tileTime,flow:null,fast:false,elapsed:0,replaces:0,pathLen:0,resultT:0,fx:[],floats:[],qShift:0,lock:0,lockMax:1,pending:[],lastTick:99,stars:0});
+  Object.assign(G,{oneWayPassed:0,flowT:0,hurry:0,hurryShow:0,crosses:0,crossReq:cfg.crossReq||0,phase:'ready',countdown:cfg.countdown,tileTime:cfg.tileTime,flow:null,fast:false,elapsed:0,replaces:0,pathLen:0,resultT:0,fx:[],floats:[],qShift:0,lock:0,lockMax:1,pending:[],lastTick:99,stars:0});
   G.dangerT=Math.min(cfg.countdown,90)+cfg.tileTime*(cfg.minDist+4);
   G.concept.scene.reset();AU.setMusic(G.concept.music||'play');
 }
@@ -1026,7 +1056,7 @@ function updateFlow(dt){
     const nr=f.r+DY[f.to],nc=f.c+DX[f.to],inS=OPP(f.to);
     if(nr<0||nc<0||nr>=ROWS||nc>=COLS){leak(f);return;}
     const cell=G.grid[nr][nc];let seg=null;
-    if(cell.t==='G'){if(cell.dir===inS){if(G.pathLen<G.req||G.crosses<G.crossReq){shortFail(f);return;}seg={r:nr,c:nc,from:inS,to:-1,p:0,frac:0.5};}}
+    if(cell.t==='G'){if(cell.dir===inS){if(G.pathLen<G.req||G.crosses<G.crossReq||G.oneWayPassed<G.oneWayTotal){shortFail(f);return;}seg={r:nr,c:nc,from:inS,to:-1,p:0,frac:0.5};}}
     else if(cell.t&&cell.t!=='S'&&cell.t!=='R'){
       const ex=cell.t==='O'?(inS===OPP(cell.dir)?cell.dir:-1):exitFor(cell.t,inS);
       if(cell.t==='O'&&ex<0){const [wx,wy]=cellCenter(nr,nc);addFloat(wx,wy-10,'반대 방향!','#ff7a6a',20);}
@@ -1036,7 +1066,7 @@ function updateFlow(dt){
     cell.fills.push(seg);G.flow=seg;
     if(seg.to!==-1){
       G.pathLen++;const [x,y]=cellCenter(nr,nc);let pts=100+(G.fast?50:0);
-      if(cell.t==='O'){pts+=300;addFloat(x,y-16,'➡️ 일방통행 +300','#ffe14d',18);AU.bonus();}
+      if(cell.t==='O'){pts+=300;G.oneWayPassed++;addFloat(x,y-16,`➡️ 화살표 ${G.oneWayPassed}/${G.oneWayTotal} +300`,'#ffe14d',18);AU.bonus();}
       if(cell.t==='X'&&cell.fills.length===1){G.crosses++;if(G.crossReq){addFloat(x,y-14,`✚ 크로스 ${G.crosses}/${G.crossReq}`,'#c9a8ff',20);AU.bonus();}}
       if(cell.t==='X'&&cell.fills.length===2){pts+=400;addFloat(x,y-14,'크로스 보너스!','#ffe14d',20);AU.bonus();}
       addFloat(x,y,'+'+pts,'#bfefff',15);G.score+=pts;AU.glug();
@@ -1045,8 +1075,8 @@ function updateFlow(dt){
   }
 }
 function shortFail(f){G.phase='leak';G.resultT=0;G.leakSeg=null;G.loseReason='short';G.flow=null;AU.bump();AU.lose();G.shake=0.3;
-  G.shortWhy=G.pathLen<G.req?'pipe':'cross';
-  const [x,y]=cellCenter(G.goal.r,G.goal.c);addFloat(x,y-12,G.shortWhy==='pipe'?`${G.req-G.pathLen}개 모자라요!`:`크로스 ${G.crossReq-G.crosses}개 모자라요!`,'#ff7a6a',22);}
+  G.shortWhy=G.pathLen<G.req?'pipe':G.crosses<G.crossReq?'cross':'oneway';
+  const [x,y]=cellCenter(G.goal.r,G.goal.c);addFloat(x,y-12,G.shortWhy==='pipe'?`${G.req-G.pathLen}개 모자라요!`:G.shortWhy==='cross'?`크로스 ${G.crossReq-G.crosses}개 모자라요!`:`화살표 ${G.oneWayTotal-G.oneWayPassed}개를 안 지났어요!`,'#ff7a6a',22);}
 function leak(f){G.loseReason='leak';G.phase='leak';G.resultT=0;G.leakSeg=f;G.flow=null;AU.leak();G.shake=0.45;
   const [x,y]=cellCenter(f.r,f.c);addFloat(x,y-12,'앗! 새요!','#ff7a6a',22);}
 function win(){
@@ -1182,7 +1212,9 @@ function drawHUD(){
   else if(G.phase==='saving'){pill(s.x+10,y2,G.concept.saveMsg,fs*1.1,'#ffe14d');y3=y2+ph+8;}
   const okp=G.pathLen>=G.req;
   const ph3=pill(s.x+10,y3,okp?`🔧 ${G.pathLen}/${G.req} 완료!`:`🔧 파이프 ${G.pathLen}/${G.req}`,fs,okp?'#5dff8a':'#ffd54a');
-  if(G.crossReq){const okc=G.crosses>=G.crossReq;pill(s.x+10,y3+ph3+8,okc?`✚ ${G.crosses}/${G.crossReq} 완료!`:`✚ 크로스 ${G.crosses}/${G.crossReq}`,fs,okc?'#5dff8a':'#c9a8ff');}
+  let y4=y3+ph3+8;
+  if(G.oneWayTotal){const oko=G.oneWayPassed>=G.oneWayTotal;const h4=pill(s.x+10,y4,oko?`➡️ ${G.oneWayPassed}/${G.oneWayTotal} 완료!`:`➡️ 화살표 ${G.oneWayPassed}/${G.oneWayTotal}`,fs,oko?'#5dff8a':'#ffe14d');y4+=h4+8;}
+  if(G.crossReq){const okc=G.crosses>=G.crossReq;pill(s.x+10,y4,okc?`✚ ${G.crosses}/${G.crossReq} 완료!`:`✚ 크로스 ${G.crosses}/${G.crossReq}`,fs,okc?'#5dff8a':'#c9a8ff');}
 }
 function drawQueue(){
   const q=LAY.queue,cell=LAY.grid.cell,col=G.concept.color;
@@ -1234,7 +1266,8 @@ function drawGrid(){
   }
   if(!reached){const fs2=Math.max(11,s*0.27),left=G.req-G.pathLen,top=G.goal.dir!==N;
     const lc=G.crossReq-G.crosses;
-    const label=(G.level<=2?'여기까지! ':'')+(left>0||lc>0?`${G.req}개`+(G.crossReq?` ✚${G.crossReq}`:''):'OK!');
+    const lo=G.oneWayTotal-G.oneWayPassed;
+    const label=(G.level<=2?'여기까지! ':'')+(left>0||lc>0||lo>0?`${G.req}개`+(G.crossReq?` ✚${G.crossReq}`:'')+(G.oneWayTotal?` ➡️${G.oneWayTotal}`:''):'OK!');
     ctx.font=`${fs2}px ${FT}`;const lw=ctx.measureText(label).width/2+6,gl=LAY.grid;
     const lx=clamp(gx+s/2,gl.x+lw,gl.x+gl.cell*COLS-lw);
     txt(label,lx,(top?gy+s*0.1:gy+s*0.92)+Math.sin(G.time*5)*2,fs2,left>0?'#ffe14d':'#5dff8a',{font:FT,stroke:'#000',sw:4});
@@ -1290,7 +1323,7 @@ function drawOverlay(){
     const cdTxt=isFinite(cfg.countdown)?`⏱ ${cfg.countdown}초`:'⏱ 시간 제한 없음';
     const crTxt=G.crossReq?`✚ 크로스 파이프 ${G.crossReq}개를 지나가요`:'';
     const lines=G.level===1?[cp.introShort,`🔧 파이프 ${G.req}개 이상`,crTxt,'👆 칸을 누르면 파이프가 놓여요',isFinite(cfg.countdown)?cdTxt:'💧 다 놓으면 [보내기] 버튼!'].filter(Boolean)
-      :[`🔧 파이프 ${G.req}개 이상`,crTxt,cdTxt+(cfg.rocks?` · 🚧 ${cfg.rocks}개`:''),G.level===4?'🧭 이제 방향이 바뀌어요!':'',cfg.oneWay?(G.level===5?'🆕 ➡️ 화살표 파이프는 그 방향으로만!':`➡️ 화살표 파이프 ${cfg.oneWay}개`):''].filter(Boolean);
+      :[`🔧 파이프 ${G.req}개 이상`,crTxt,cdTxt+(cfg.rocks?` · 🚧 ${cfg.rocks}개`:''),G.level===4?'🧭 이제 방향이 바뀌어요!':'',G.oneWayTotal?(G.level===5?'🆕 ➡️ 화살표 파이프를 꼭 지나가요! (화살표 방향으로)':`➡️ 화살표 파이프 ${G.oneWayTotal}개를 꼭 지나가요`):''].filter(Boolean);
     const b=panelBox(lines,`${G.level}단계`,fs);
     button(b.x+24,b.y+6,b.w-48,58,cp.goBtn,cp.color,()=>{G.phase='countdown';cp.startSfx();},{size:26,glow:true});
   }else if(ph==='won'){
@@ -1300,7 +1333,7 @@ function drawOverlay(){
     button(b.x+24,b.y+6,64,58,'🏠','#3a3f5a',goHome,{size:24});
     button(b.x+100,b.y+6,b.w-124,58,'다음 단계 ▶',cp.color,()=>startLevel(G.level+1),{size:24,glow:true});
   }else{
-    const b=G.loseReason==='short'?(G.shortWhy==='cross'?panelBox([`크로스 파이프를 ${G.crossReq}개`,'지나가게 이어야 해요!'],'✚ 크로스가 모자라요',fs):panelBox([`파이프를 ${G.req}개 이상 이어서`,'빙 돌아가야 해요!'],'😅 파이프가 모자라요',fs)):panelBox([cp.loseLine],cp.loseTitle,fs);
+    const b=G.loseReason==='short'?(G.shortWhy==='oneway'?panelBox(['화살표 파이프를 모두','화살표 방향으로 지나가야 해요!'],'➡️ 화살표를 안 지났어요',fs):G.shortWhy==='cross'?panelBox([`크로스 파이프를 ${G.crossReq}개`,'지나가게 이어야 해요!'],'✚ 크로스가 모자라요',fs):panelBox([`파이프를 ${G.req}개 이상 이어서`,'빙 돌아가야 해요!'],'😅 파이프가 모자라요',fs)):panelBox([cp.loseLine],cp.loseTitle,fs);
     button(b.x+24,b.y+6,64,58,'🏠','#3a3f5a',goHome,{size:24});
     button(b.x+100,b.y+6,b.w-124,58,'🔄 다시 도전','#2a9df4',()=>{G.score=G.levelStartScore;startLevel(G.level);},{size:24,glow:true});
   }
