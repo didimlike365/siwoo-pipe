@@ -48,7 +48,7 @@ function loadSave(){try{return JSON.parse(localStorage.getItem(STORE_KEY))||{};}
 function saveSave(){try{localStorage.setItem(STORE_KEY,JSON.stringify(SAVE));}catch(e){}}
 const SAVE=loadSave(); SAVE.best=SAVE.best||{};
 // 난이도: 초보=타이머 없음(버튼으로 시작), 중수=대기시간 3배, 고수=기본
-const DIFFS={easy:{name:'초보',icon:'🐣',mult:Infinity,col:'#5dd36a'},normal:{name:'중수',icon:'🙂',mult:3,col:'#3aa0ff'},hard:{name:'고수',icon:'🔥',mult:1,col:'#ff5a3a'}};
+const DIFFS={easy:{name:'초보',icon:'🐣',mult:Infinity,col:'#5dd36a'},normal:{name:'중수',icon:'🙂',mult:3,col:'#3aa0ff'},hard:{name:'고수',icon:'🔥',mult:1,col:'#ff5a3a'},master:{name:'초고수',icon:'👑',mult:0.8,col:'#b040ff',master:true}};
 if(!SAVE.diff){SAVE.diff='easy';for(const k of Object.keys(SAVE.best))if(!k.includes('_')){SAVE.best[k+'_hard']=SAVE.best[k];delete SAVE.best[k];}}
 const DF=()=>DIFFS[SAVE.diff]||DIFFS.easy;
 const bestKey=cp=>cp.id+'_'+SAVE.diff;
@@ -1528,14 +1528,15 @@ function genLevel(cfg,depth){
 }
 function startLevel(n){
   const cfg=levelCfg(n);G.level=n;G.cfg=cfg;G.levelStartScore=G.score;
-  G.req=0;G.oneWayTotal=0;G.keyTotal=0;genLevel(cfg);if(!G.req)G.req=G.minLen;
+  G.req=0;G.oneWayTotal=0;G.keyTotal=0;G.wrapRows=[];G.wrapCols=[];G.masterCross=0;
+  if(!(DF().master&&genMaster(cfg)))genLevel(cfg);if(!G.req)G.req=G.minLen;
   G.queue=[];for(let i=0;i<5;i++)G.queue.push(newPiece());
-  Object.assign(G,{keyPassed:0,hot:false,crossCells:[],tallyList:[],tallyIdx:0,ttabongT:-1,oneWayPassed:0,flowT:0,hurry:0,hurryShow:0,crosses:0,crossReq:cfg.crossReq||0,phase:'ready',countdown:cfg.countdown,tileTime:cfg.tileTime,flow:null,fast:false,elapsed:0,replaces:0,pathLen:0,resultT:0,fx:[],floats:[],qShift:0,lock:0,lockMax:1,pending:[],lastTick:99,stars:0});
+  Object.assign(G,{conn:[],connN:0,connPop:0,connReached:false,keyPassed:0,hot:false,crossCells:[],tallyList:[],tallyIdx:0,ttabongT:-1,oneWayPassed:0,flowT:0,hurry:0,hurryShow:0,crosses:0,crossReq:cfg.crossReq||0,phase:'ready',countdown:cfg.countdown,tileTime:cfg.tileTime,flow:null,fast:false,elapsed:0,replaces:0,pathLen:0,resultT:0,fx:[],floats:[],qShift:0,lock:0,lockMax:1,pending:[],lastTick:99,stars:0});
   G.dangerT=Math.min(cfg.countdown,90)+cfg.tileTime*(cfg.minDist+4);
   G.concept.scene.reset();AU.setMusic(G.concept.music||'play');
 }
 function selectConcept(cp,lvl){G.concept=cp;G.screen='play';G.score=0;spriteCache={};startLevel(lvl);}
-function goHome(){G.screen='title';AU.setMusic('title');}
+function goHome(){G.screen='title';G.floats=[];G.fx=[];AU.setMusic('title');}
 function toggleMute(){SAVE.muted=!SAVE.muted;saveSave();if(AU.c)AU.master.gain.value=SAVE.muted?0:0.85;}
 function cellXY(r,c){const g=LAY.grid;return [g.x+c*g.cell,g.y+r*g.cell];}
 function cellCenter(r,c){const g=LAY.grid;return [g.x+(c+0.5)*g.cell,g.y+(r+0.5)*g.cell];}
@@ -1575,8 +1576,8 @@ function updateFlow(dt){
   while(f.p>=1){
     const over=(f.p-1)*f.frac;f.p=1;
     if(f.to===-1){win();return;}
-    const nr=f.r+DY[f.to],nc=f.c+DX[f.to],inS=OPP(f.to);
-    if(nr<0||nc<0||nr>=ROWS||nc>=COLS){leak(f);return;}
+    const nx=nextCell(f.r,f.c,f.to),inS=OPP(f.to);
+    if(!nx){leak(f);return;}const nr=nx[0],nc=nx[1];
     const cell=G.grid[nr][nc];let seg=null;
     if(cell.t==='G'){if(cell.dir===inS){if(G.pathLen<G.req||G.crosses<G.crossReq||G.oneWayPassed<G.oneWayTotal||G.keyPassed<G.keyTotal){shortFail(f);return;}seg={r:nr,c:nc,from:inS,to:-1,p:0,frac:0.5};}}
     else if(cell.t&&cell.t!=='S'&&cell.t!=='R'){
@@ -1713,6 +1714,83 @@ function drawTallyGrid(){
     ctx.save();ctx.lineWidth=3;ctx.strokeStyle='#ffd23a';ctx.shadowColor='#ffb000';ctx.shadowBlur=14;rr(ctx,x+2,y+2,s-4,s-4,8);ctx.stroke();ctx.restore();
     txt(String(i+1),x+s*0.82,y+s*0.18,Math.max(11,s*0.3),'#ffe14d',{font:FT,stroke:'#000',sw:4});
   }
+}
+
+/* ================= 초고수: 길 하나뿐인 판 + 포탈(벽끝 연결) + 크로스 강제 ================= */
+function nextCell(r,c,d){
+  let nr=r+DY[d],nc=c+DX[d];
+  if(nr>=0&&nc>=0&&nr<ROWS&&nc<COLS)return [nr,nc];
+  if((d===E||d===WW)&&G.wrapRows&&G.wrapRows.includes(r))return [r,(nc+COLS)%COLS];
+  if((d===N||d===S)&&G.wrapCols&&G.wrapCols.includes(c))return [(nr+ROWS)%ROWS,c];
+  return null;
+}
+function genMaster(cfg){
+  const n=G.level,L=Math.min(28,12+n*2),needCross=n%3!==2,needWrap=n%3!==1;
+  const inb=(r,c)=>r>=0&&c>=0&&r<ROWS&&c<COLS;
+  const nOne=cfg.oneWay||0,nKey=cfg.keyReq||0,nCrossReq=cfg.crossReq||0;
+  for(let tries=0;tries<600;tries++){
+    const sr=ri(ROWS),sc=ri(COLS),sd=ri(4),p0=[sr+DY[sd],sc+DX[sd]];
+    if(!inb(p0[0],p0[1]))continue;
+    const vis=new Map([[sr*COLS+sc,{cnt:9}]]),path=[],wrapRows=new Set(),wrapCols=new Set();let crossN=0,steps=0,goal=null;
+    function dfs(r,c,inD){
+      if(++steps>25000)return false;
+      const key=r*COLS+c,v=vis.get(key);let outs;
+      if(v){if(v.cnt!==1||v.kind!=='s'||v.axis===inD%2||path.length<3)return false;outs=[inD];}
+      else{const tr=[(inD+1)%4,(inD+3)%4].sort(()=>Math.random()-0.5);outs=Math.random()<0.45?[inD,...tr]:[...tr,inD];}
+      for(const od of outs){
+        if(v){v.cnt=2;crossN++;}else vis.set(key,{cnt:1,kind:od===inD?'s':'t',axis:inD%2});
+        path.push([r,c,inD,od]);
+        if(path.length>=L&&(!needCross||crossN>0)&&(!needWrap||wrapRows.size+wrapCols.size>0)&&!v){
+          const gr=r+DY[od],gc=c+DX[od];
+          if(inb(gr,gc)&&!vis.has(gr*COLS+gc)){goal=[gr,gc,OPP(od)];return true;}
+        }
+        if(path.length<L+5){
+          let nr=r+DY[od],nc=c+DX[od],ok=true,added=null;
+          if(!inb(nr,nc)){
+            const lanes=wrapRows.size+wrapCols.size,horiz=od===E||od===WW;
+            if(horiz){if(wrapRows.has(r)||(needWrap&&lanes<2&&Math.random()<0.8)){if(!wrapRows.has(r)){wrapRows.add(r);added=['r',r];}nc=(nc+COLS)%COLS;}else ok=false;}
+            else{if(wrapCols.has(c)||(needWrap&&lanes<2&&Math.random()<0.8)){if(!wrapCols.has(c)){wrapCols.add(c);added=['c',c];}nr=(nr+ROWS)%ROWS;}else ok=false;}
+          }
+          if(ok&&dfs(nr,nc,od))return true;
+          if(added)(added[0]==='r'?wrapRows:wrapCols).delete(added[1]);
+        }
+        path.pop();if(v){v.cnt=1;crossN--;}else vis.delete(key);
+      }
+      return false;
+    }
+    if(!dfs(p0[0],p0[1],sd))continue;
+    // 포탈 줄은 실제로 쓴 것만 남김
+    const usedR=new Set(),usedC=new Set();
+    for(let i=0;i<path.length-1;i++){const [r,c,,od]=path[i],[r2,c2]=path[i+1];if(Math.abs(r2-r)+Math.abs(c2-c)>1){if(od===E||od===WW)usedR.add(r);else usedC.add(c);}}
+    if(needWrap&&usedR.size+usedC.size===0)continue;
+    // 필수 아이템 자리: 한 번만 지나는 직선 칸
+    const crossCells=new Set([...vis].filter(([k,v])=>v.cnt===2).map(([k])=>k));
+    const straight=[];path.forEach(([r,c,inD,od],i)=>{if(i>0&&i<path.length-1&&inD===od&&!crossCells.has(r*COLS+c))straight.push({i,r,c,dir:od});});
+    if(straight.length<nOne+nKey+Math.max(0,nCrossReq-crossCells.size))continue;
+    const grid=[];for(let r=0;r<ROWS;r++){const row=[];for(let c=0;c<COLS;c++)row.push({t:'R',dir:-1,fills:[],pt:0});grid.push(row);}
+    for(const [r,c] of path)grid[r][c]=emptyCell();
+    grid[sr][sc]={t:'S',dir:sd,fills:[],pt:0};grid[goal[0]][goal[1]]={t:'G',dir:goal[2],fills:[],pt:0};
+    const pool=straight.sort(()=>Math.random()-0.5),used=[];
+    const take=(cnt,t)=>{let k=0;for(const o of pool){if(k>=cnt)break;if(used.some(x=>Math.abs(x.i-o.i)<2))continue;used.push(o);grid[o.r][o.c]={t,dir:o.dir,fills:[],pt:0};k++;}return k;};
+    const gotO=take(nOne,'O'),gotK=take(nKey,'K');if(gotO<nOne||gotK<nKey)continue;
+    // 미끼 빈칸 몇 개 (크로스 칸 근처는 제외 → 크로스 없이 우회 불가)
+    const near=(r,c)=>[...crossCells].some(k=>Math.abs(Math.floor(k/COLS)-r)+Math.abs(k%COLS-c)<=2);
+    let dec=3,g2=0;while(dec>0&&g2++<200){const r=ri(ROWS),c=ri(COLS);if(grid[r][c].t!=='R'||near(r,c))continue;grid[r][c]=emptyCell();dec--;}
+    G.grid=grid;G.start={r:sr,c:sc,dir:sd};G.goal={r:goal[0],c:goal[1],dir:goal[2]};
+    G.wrapRows=[...usedR];G.wrapCols=[...usedC];G.req=path.length;G.minLen=path.length;
+    G.oneWayTotal=gotO;G.keyTotal=gotK;G.masterPath=path;G.masterCross=crossCells.size;G.solution=null;return true;
+  }
+  return false;
+}
+function drawPortals(){
+  if(!(G.wrapRows&&G.wrapRows.length)&&!(G.wrapCols&&G.wrapCols.length))return;
+  const g=LAY.grid,s=g.cell,gw=s*COLS,gh=s*ROWS,cols=['#00e5ff','#ff4dff'];let k=0;
+  const mark=(x,y,ang,col)=>{ctx.save();ctx.translate(x,y);ctx.rotate(ang);ctx.shadowColor=col;ctx.shadowBlur=14;
+    ctx.strokeStyle=col;ctx.lineWidth=4;ctx.beginPath();ctx.ellipse(0,0,s*0.12,s*0.36,0,0,7);ctx.stroke();
+    ctx.setLineDash([s*0.08,s*0.08]);ctx.lineDashOffset=-G.time*s*0.5;ctx.lineWidth=2;ctx.beginPath();ctx.ellipse(0,0,s*0.07,s*0.24,0,0,7);ctx.stroke();ctx.restore();};
+  for(const r of G.wrapRows){const col=cols[k++%2],y=g.y+(r+0.5)*s;mark(g.x,y,0,col);mark(g.x+gw,y,0,col);
+    txt('🌀',g.x-s*0.02,y-s*0.42,Math.max(10,s*0.22),'#fff');txt('🌀',g.x+gw+s*0.02,y-s*0.42,Math.max(10,s*0.22),'#fff');}
+  for(const c of G.wrapCols){const col=cols[k++%2],x=g.x+(c+0.5)*s;mark(x,g.y,Math.PI/2,col);mark(x,g.y+gh,Math.PI/2,col);}
 }
 
 /* ================= 레이아웃 ================= */
@@ -1855,8 +1933,8 @@ function drawHUD(){
     txt(String(sec),cx,cy+Math.min(s.h*0.42,s.w*0.3)*0.08,big,col,{font:FT,stroke:'rgba(0,0,0,0.8)',sw:big*0.1,glow:urgent?'#ff2a00':'#5cc8ff',blur:24});
   }else if(G.phase==='flow'){pill(s.x+10,y2,G.concept.flowMsg+(G.hurry?' '+'⚡'.repeat(Math.min(G.hurry,3)):''),fs,G.hurry?'#ffd23a':'#7fd8ff');y3=y2+ph+8;}
   else if(G.phase==='saving'){pill(s.x+10,y2,G.concept.saveMsg,fs*1.1,'#ffe14d');y3=y2+ph+8;}
-  const okp=G.pathLen>=G.req;
-  const ph3=pill(s.x+10,y3,okp?`🔧 ${G.pathLen}/${G.req} 완료!`:`🔧 파이프 ${G.pathLen}/${G.req}`,fs,okp?'#5dff8a':'#ffd54a');
+  const cn=Math.max(G.connN,G.pathLen),okp=cn>=G.req,pp=1+0.35*Math.max(0,G.connPop);
+  const ph3=pill(s.x+10,y3,okp?`🔗 연결 ${cn}/${G.req} 완료!`:`🔗 연결 ${cn}/${G.req}`,fs*pp,okp?'#5dff8a':'#ffd54a');
   let y4=y3+ph3+8;
   if(G.keyTotal){const okk=G.keyPassed>=G.keyTotal,cp=G.concept;const h5=pill(s.x+10,y4,okk?`${cp.keyIcon} ${G.keyPassed}/${G.keyTotal} 완료!`:`${cp.keyIcon} ${cp.keyName} ${G.keyPassed}/${G.keyTotal}`,fs,okk?'#5dff8a':'#ffb070');y4+=h5+8;}
   if(G.oneWayTotal){const oko=G.oneWayPassed>=G.oneWayTotal;const h4=pill(s.x+10,y4,oko?`➡️ ${G.oneWayPassed}/${G.oneWayTotal} 완료!`:`➡️ 화살표 ${G.oneWayPassed}/${G.oneWayTotal}`,fs,oko?'#5dff8a':'#ffe14d');y4+=h4+8;}
@@ -1879,6 +1957,43 @@ function drawQueue(){
     if(i===0){const fs=Math.max(11,big*0.26);rr(ctx,px+sz/2-fs*1.4,py-fs*0.55,fs*2.8,fs*1.2,fs*0.5);ctx.fillStyle=col;ctx.fill();txt('다음!',px+sz/2,py+fs*0.05,fs,'#fff',{font:FT});}
   }
 }
+/* 출발점에서 실제로 이어진 파이프 찾기 (실시간) */
+function traceConn(){
+  const out=[],seen=new Set();if(!G.grid||!G.start)return {cells:out,reached:false};
+  let r=G.start.r,c=G.start.c,d=G.start.dir;
+  for(let k=0;k<ROWS*COLS*2;k++){
+    const nx=nextCell(r,c,d);if(!nx)break;const nr=nx[0],nc=nx[1];
+    const cell=G.grid[nr][nc],inS=OPP(d);
+    if(cell.t==='G')return {cells:out,reached:cell.dir===inS};
+    if(!cell.t||cell.t==='S'||cell.t==='R')break;
+    const ex=cell.t==='O'?(inS===OPP(cell.dir)?cell.dir:-1):cell.t==='K'?(inS===OPP(cell.dir)?cell.dir:inS===cell.dir?OPP(cell.dir):-1):exitFor(cell.t,inS);
+    if(ex<0)break;const key=nr*COLS+nc+'/'+inS;if(seen.has(key))break;seen.add(key);
+    out.push([nr,nc]);r=nr;c=nc;d=ex;
+  }
+  return {cells:out,reached:false};
+}
+function updateConn(dt){
+  if(!G.grid)return;const t=traceConn(),n=t.cells.length;
+  if(n>G.connN&&(G.phase==='countdown'||G.phase==='flow')){
+    const [r,c]=t.cells[n-1],[x,y]=cellCenter(r,c);G.connPop=1;
+    if(t.reached&&!G.connReached)addFloat(x,y-14,'🎯 도착까지 연결!','#5dff8a',20);
+    else addFloat(x,y-14,`🔗 ${n}`,'#ffe14d',20);
+    if(AU.c)AU.glock(mf(72+Math.min(n,24)),0.25,AU.c.currentTime,0.08);
+  }
+  G.conn=t.cells;G.connN=n;G.connReached=t.reached;G.connPop=Math.max(0,G.connPop-dt*3);
+}
+function drawConn(){
+  if(!(G.phase==='countdown'||G.phase==='flow'||G.phase==='ready'))return;
+  const s=LAY.grid.cell,col=G.connReached?'#5dff8a':G.concept.color,pulse=0.55+0.45*Math.sin(G.time*5);
+  G.conn.forEach(([r,c],i)=>{
+    const [x,y]=cellXY(r,c),last=i===G.conn.length-1;
+    ctx.save();ctx.lineWidth=last?3.5:2.5;ctx.strokeStyle=col;ctx.globalAlpha=last?1:0.55+0.35*pulse;ctx.shadowColor=col;ctx.shadowBlur=last?16:8;
+    rr(ctx,x+3,y+3,s-6,s-6,8);ctx.stroke();ctx.restore();
+    const fs=Math.max(10,s*0.26),bx=x+s*0.18,by=y+s*0.18;
+    ctx.save();ctx.fillStyle=col;ctx.globalAlpha=0.92;ctx.beginPath();ctx.arc(bx,by,fs*0.68,0,7);ctx.fill();ctx.restore();
+    txt(String(i+1),bx,by+1,fs*(last?1+0.4*G.connPop:1),'#10121c',{font:FT});
+  });
+}
 function drawGrid(){
   const g=LAY.grid,s=g.cell,cp=G.concept,gw=s*COLS,gh=s*ROWS;
   ctx.save();ctx.shadowColor=cp.frame;ctx.shadowBlur=18;rr(ctx,g.x-BZ,g.y-BZ,gw+BZ*2,gh+BZ*2,10);ctx.fillStyle='#161923';ctx.fill();ctx.restore();
@@ -1892,6 +2007,7 @@ function drawGrid(){
     let sc=1;if(cell.pt){const a=(G.time-cell.pt)/0.22;if(a<1)sc=easeOutBack(Math.max(0,a));}
     if(sc!==1){ctx.save();ctx.translate(x+s/2,y+s/2);ctx.scale(sc,sc);ctx.drawImage(sp,-s/2,-s/2,s,s);ctx.restore();}else ctx.drawImage(sp,x,y,s,s);
   }
+  drawPortals();drawConn();
   for(const pd of G.pending){const [x,y]=cellXY(pd.r,pd.c),k=clamp((pd.at-G.time)/0.5,0,1);
     ctx.save();ctx.fillStyle='rgba(255,180,40,0.18)';ctx.fillRect(x+2,y+2,s-4,s-4);
     ctx.lineWidth=Math.max(3,s*0.08);ctx.strokeStyle='rgba(0,0,0,0.5)';ctx.beginPath();ctx.arc(x+s/2,y+s/2,s*0.34,0,7);ctx.stroke();
@@ -1969,7 +2085,8 @@ function drawOverlay(){
     const cdTxt=isFinite(cfg.countdown)?`⏱ ${cfg.countdown}초`:'⏱ 시간 제한 없음';
     const crTxt=G.crossReq?`✚ 크로스 파이프 ${G.crossReq}개를 지나가요`:G.keyTotal?cp.keyLine(G.keyTotal):'';
     const lines=G.level===1?[cp.introShort,`🔧 파이프 ${G.req}개 이상`,crTxt,'👆 칸을 누르면 파이프가 놓여요',isFinite(cfg.countdown)?cdTxt:'💧 다 놓으면 [보내기] 버튼!'].filter(Boolean)
-      :[`🔧 파이프 ${G.req}개 이상`,crTxt,cdTxt+(cfg.rocks?` · 🚧 ${cfg.rocks}개`:''),G.level===4?'🧭 이제 방향이 바뀌어요!':'',G.oneWayTotal?(G.level===5?'🆕 ➡️ 화살표 파이프를 꼭 지나가요! (화살표 방향으로)':`➡️ 화살표 파이프 ${G.oneWayTotal}개를 꼭 지나가요`):''].filter(Boolean);
+      :[`🔧 파이프 ${G.req}개 이상`,crTxt,cdTxt+(cfg.rocks?` · 🚧 ${cfg.rocks}개`:''),(DF().master?'':G.level===4?'🧭 이제 방향이 바뀌어요!':''),(G.wrapRows.length||G.wrapCols.length)?'🌀 같은 색 벽끝은 서로 이어져요!':'',G.masterCross?'✚ 길이 겹치는 곳은 크로스로!':'',G.oneWayTotal?(G.level===5?'🆕 ➡️ 화살표 파이프를 꼭 지나가요! (화살표 방향으로)':`➡️ 화살표 파이프 ${G.oneWayTotal}개를 꼭 지나가요`):''].filter(Boolean);
+    if(G.level===1&&DF().master){if(G.wrapRows.length||G.wrapCols.length)lines.push('🌀 같은 색 벽끝은 서로 이어져요!');if(G.masterCross)lines.push('✚ 길이 겹치는 곳은 크로스로!');}
     const b=panelBox(lines,`${G.level}단계`,fs);
     button(b.x+24,b.y+6,b.w-48,58,cp.goBtn,cp.color,()=>{G.phase='countdown';cp.startSfx();},{size:26,glow:true});
   }else if(ph==='won'){
@@ -2035,11 +2152,11 @@ function drawTitle(){
   txt('물길 대작전',W/2,ty+big*0.12+bob,big,'#ffffff',{font:FT,stroke:'#c3271c',sw:big*0.16,glow:'#ff6a2a',blur:24});
   txt('하고 싶은 컨셉을 골라요!',W/2,ty+big*1.0,Math.max(15,big*0.27),'#9fd8ff');
   let y0=ty+big*1.35;
-  {const keys=Object.keys(DIFFS),bw=Math.min(118,(W-48)/3),bh=46,gx=(W-(bw*3+16))/2;
+  {const keys=Object.keys(DIFFS),nk=keys.length,bw=Math.min(112,(W-24-8*(nk-1))/nk),bh=46,gx=(W-(bw*nk+8*(nk-1)))/2;
    keys.forEach((k,i)=>{const d=DIFFS[k],sel=SAVE.diff===k;
-     button(gx+i*(bw+8),y0,bw,bh,`${d.icon} ${d.name}`,sel?d.col:'#2b3045',()=>{SAVE.diff=k;saveSave();},{size:18,glow:sel,tc:sel?'#fff':'#9aa0b8'});});
+     button(gx+i*(bw+8),y0,bw,bh,`${d.icon} ${d.name}`,sel?d.col:'#2b3045',()=>{SAVE.diff=k;saveSave();},{size:Math.min(18,bw*0.18),glow:sel,tc:sel?'#fff':'#9aa0b8'});});
    y0+=bh+10;
-   const d=DF();txt(d.mult===Infinity?'타이머 없이 버튼으로 물 보내기':d.mult===3?'물 나오기까지 90초':'물 나오기까지 30초',W/2,y0+6,14,'#c9c3e0');y0+=24;}
+   const d=DF();txt(d.master?'길이 하나뿐! 포탈·크로스 · 24초':d.mult===Infinity?'타이머 없이 버튼으로 물 보내기':d.mult===3?'물 나오기까지 90초':'물 나오기까지 30초',W/2,y0+6,14,'#c9c3e0');y0+=24;}
   const NC=CONCEPTS.length;
   if(H>=W){const cw=Math.min(W-32,460),gap=10,ch=clamp((H-y0-16)/NC-gap,60,110);CONCEPTS.forEach((cp,i)=>drawCard(cp,(W-cw)/2,y0+i*(ch+gap),cw,ch,true));y0+=NC*(ch+gap);}
   else{const cols=3,rows=Math.ceil(NC/cols),cw=Math.min((W-64)/cols,300),ch=clamp((H-y0-16)/rows-12,80,180);CONCEPTS.forEach((cp,i)=>drawCard(cp,(W-(cw*cols+16*(cols-1)))/2+(i%cols)*(cw+16),y0+Math.floor(i/cols)*(ch+12),cw,ch,false));y0+=rows*(ch+12);}
@@ -2059,6 +2176,7 @@ function update(dt){
   }
   const ph=G.phase;
   if(G.lock>0)G.lock-=dt;
+  updateConn(dt);
   if(G.pending.length){G.pending=G.pending.filter(pd=>{if(G.time<pd.at)return true;const cl=G.grid[pd.r][pd.c];
     if(!cl.t&&!cl.fills.length&&(G.phase==='countdown'||G.phase==='flow')){cl.t=pd.type;cl.pt=G.time;AU.place();}return false;});}
   G.qShift=Math.max(0,G.qShift-dt*7);G.shake=Math.max(0,G.shake-dt);
