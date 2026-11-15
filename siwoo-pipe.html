@@ -97,7 +97,7 @@ const MUS={
           [32,77,2],[34,81,2],[36,86,4],[40,84,2],[42,81,2],[44,77,4],
           [48,79,6],[54,77,2],[56,74,4],[60,77,4]]
   },
-  triumph:{bpm:126,T:0.62, // D장조 승리 (D-G-A-D)
+  triumph:{bpm:126,T:0.62,gain:1.6, // D장조 승리 (D-G-A-D)
     chords:[[62,66,69],[67,71,74],[69,73,76],[62,66,69]],
     lead:[[0,74,4],[4,78,4],[8,81,8],[16,83,4],[20,81,4],[24,79,8],[32,81,4],[36,85,4],[40,88,8],[48,86,16]]
   }
@@ -205,7 +205,7 @@ const AU={c:null,mode:'title',step:0,next:0,T:0.3,tr:0,loops:0,
     g.connect(this.mus);
   },
   // 박수
-  clap(t,v){for(let k=0;k<3;k++)this.noise(0.02,v*0.7,'bandpass',1400,t+k*0.011,this.mus,0.8);this.noise(0.13,v,'bandpass',1300,t+0.033,this.mus,0.7);},
+  clap(t,v){this.tone(1100,0.05,'triangle',v*0.35,700,t,this.mus);this.tone(1500,0.04,'sine',v*0.25,900,t+0.012,this.mus);this.kick(t,v*0.25);},
   // 새소리 "찌르르"
   chirp(t,v,dest){for(let k=0;k<2;k++){const tt=t+k*0.11;this.tone(rnd(1700,2000),0.12,'sine',v,rnd(2500,2900),tt,dest||this.mus);}},
   pump(){if(!this.c)return;const t=this.c.currentTime;this.tone(70,1.0,'sawtooth',0.12,180,t);this.noise(1.0,0.2,'lowpass',600,t,this.sfx);this.tone(900,0.15,'sine',0.08,1200,t+0.9);},
@@ -215,32 +215,50 @@ const AU={c:null,mode:'title',step:0,next:0,T:0.3,tr:0,loops:0,
   ttabong(){if(!this.c)return;const t=this.c.currentTime;for(const n of [72,76,79,84])this.brass(mf(n),0.7,t,0.08);this.crash(t);this.kick(t);this.glock(mf(96),0.8,t+0.1,0.15);},
   heartbeat(on){
     const c=this.c,now=c.currentTime;
-    if(on&&!this.hbOn){this.hbOn=true;this.hbNext=now+0.6;this.startDrone();}
+    if(on&&!this.hbOn){this.hbOn=true;this.hbNext=now+0.6;this.hbN=0;this.startDrone();}
     if(!on&&this.hbOn){this.hbOn=false;this.stopDrone();}
     if(!this.hbOn)return;
-    const h=Math.min(G.hurry||0,3),iv=60/[68,92,118,142][h],v=0.55+0.13*h;
-    if(this.hbTrem)this.hbTrem.g.gain.setTargetAtTime(h>=1?0.01+0.008*h:0,now,0.4);
-    if(this.hbDrone){this.hbDrone.f.frequency.setTargetAtTime(240+140*h,now,0.6);this.hbDrone.g.gain.setTargetAtTime(0.08+0.025*h,now,0.6);}
-    while(this.hbNext<now+0.15){const t=this.hbNext;
-      this.tone(58,0.17,'sine',v,34,t,this.sfx);this.noise(0.08,v*0.25,'lowpass',140,t,this.sfx);
-      this.tone(50,0.15,'sine',v*0.72,32,t+Math.min(0.2,iv*0.3),this.sfx);
-      if(h>=2)this.noise(iv*0.9,0.03*h,'bandpass',700,t,this.sfx,0.6);
+    const h=Math.min(G.hurry||0,3),iv=60/[66,86,108,132][h],v=0.5+0.12*h;
+    if(this.hbDrone)this.hbDrone.f.frequency.setTargetAtTime(380+160*h,now,0.8);
+    if(this.hbTrem)this.hbTrem.g.gain.setTargetAtTime(h>=1?0.018+0.008*h:0,now,0.6);
+    while(this.hbNext<now+0.15){const t=this.hbNext,n=this.hbN++;
+      // 심장 "쿵-쿵": 순수한 저음 사인파 (잡음 없음)
+      this.thump(t,v);this.thump(t+Math.min(0.22,iv*0.3),v*0.62);
+      // 박동에 맞춰 저음이 숨 쉬듯 커졌다 작아짐
+      if(this.hbDrone){const g=this.hbDrone.g.gain,base=0.05+0.02*h;g.setValueAtTime(base,t);g.linearRampToValueAtTime(base*1.9,t+0.06);g.linearRampToValueAtTime(base,t+Math.min(0.5,iv*0.8));}
+      // HURRY UP부터: 피치카토로 맥박 리듬 (근음·5도)
+      if(h>=1){const root=[45,45,46,47][h],notes=[root,root+7,root+12,root+7];this.pizz(mf(notes[n%4]+12),t,0.09+0.02*h);
+        if(h>=2)this.pizz(mf(notes[(n+2)%4]+12),t+iv/2,0.06+0.02*h);}
       this.hbNext+=iv;}
+  },
+  thump(t,v){
+    const c=this.c,o=c.createOscillator(),g=c.createGain(),f=c.createBiquadFilter();
+    o.type='sine';o.frequency.setValueAtTime(70,t);o.frequency.exponentialRampToValueAtTime(42,t+0.16);
+    f.type='lowpass';f.frequency.value=180;
+    g.gain.setValueAtTime(0.0001,t);g.gain.exponentialRampToValueAtTime(v,t+0.012);g.gain.exponentialRampToValueAtTime(0.0001,t+0.26);
+    o.connect(f);f.connect(g);g.connect(this.sfx);o.start(t);o.stop(t+0.3);
+  },
+  pizz(f,t,v){
+    const c=this.c,o=c.createOscillator(),g=c.createGain(),fl=c.createBiquadFilter();o.type='triangle';o.frequency.value=f;
+    fl.type='lowpass';fl.frequency.setValueAtTime(1600,t);fl.frequency.exponentialRampToValueAtTime(400,t+0.25);
+    g.gain.setValueAtTime(0.0001,t);g.gain.exponentialRampToValueAtTime(v,t+0.006);g.gain.exponentialRampToValueAtTime(0.0001,t+0.35);
+    o.connect(fl);fl.connect(g);g.connect(this.sfx);o.start(t);o.stop(t+0.4);
   },
   startDrone(){
     const c=this.c,now=c.currentTime;
-    const f=c.createBiquadFilter();f.type='lowpass';f.frequency.value=240;f.Q.value=2;const g=c.createGain();g.gain.setValueAtTime(0.0001,now);g.gain.linearRampToValueAtTime(0.08,now+2);
-    const os=[55,58.27,82.41].map(fr=>{const o=c.createOscillator();o.type='sawtooth';o.frequency.value=fr;o.connect(f);o.start(now);return o;});
+    // 협화음 저음 (A단조: A1·E2·A2·C3) — 사인/삼각파, 반음 충돌 없음
+    const f=c.createBiquadFilter();f.type='lowpass';f.frequency.value=380;f.Q.value=0.7;const g=c.createGain();g.gain.setValueAtTime(0.0001,now);g.gain.linearRampToValueAtTime(0.05,now+2);
+    const os=[[55,'sine'],[82.41,'sine'],[110,'triangle'],[130.81,'sine']].map(([fr,ty])=>{const o=c.createOscillator();o.type=ty;o.frequency.value=fr;o.connect(f);o.start(now);return o;});
     f.connect(g);g.connect(this.sfx);this.hbDrone={os,g,f};
-    // 떨리는 현악 트레몰로(HURRY UP부터)
-    const tg=c.createGain();tg.gain.value=0;const am=c.createGain();am.gain.value=0.5;const lfo=c.createOscillator();lfo.frequency.value=9;
-    const lg=c.createGain();lg.gain.value=0.5;lfo.connect(lg);lg.connect(am.gain);const tf=c.createBiquadFilter();tf.type='lowpass';tf.frequency.value=2200;
-    const tos=[mf(76),mf(81),mf(82)].map(fr=>{const o=c.createOscillator();o.type='sawtooth';o.frequency.value=fr;o.connect(tf);o.start(now);return o;});
+    // 긴장 현악 (HURRY UP부터): 단3화음 + 부드러운 떨림
+    const tg=c.createGain();tg.gain.value=0;const am=c.createGain();am.gain.value=0.6;const lfo=c.createOscillator();lfo.frequency.value=6;
+    const lg=c.createGain();lg.gain.value=0.4;lfo.connect(lg);lg.connect(am.gain);const tf=c.createBiquadFilter();tf.type='lowpass';tf.frequency.value=1400;
+    const tos=[mf(69),mf(72),mf(76)].map(fr=>{const o=c.createOscillator();o.type='triangle';o.frequency.value=fr;o.connect(tf);o.start(now);return o;});
     tf.connect(am);am.connect(tg);tg.connect(this.sfx);tg.connect(this.rev);lfo.start(now);this.hbTrem={os:[...tos,lfo],g:tg};
   },
   stopDrone(){
     const now=this.c.currentTime;
-    for(const d of [this.hbDrone,this.hbTrem]){if(!d)continue;d.g.gain.cancelScheduledValues(now);d.g.gain.setTargetAtTime(0,now,0.2);for(const o of d.os)o.stop(now+1.2);}
+    for(const d of [this.hbDrone,this.hbTrem]){if(!d)continue;d.g.gain.cancelScheduledValues(now);d.g.gain.setValueAtTime(d.g.gain.value,now);d.g.gain.linearRampToValueAtTime(0,now+0.6);for(const o of d.os)o.stop(now+0.7);}
     this.hbDrone=null;this.hbTrem=null;
   },
   faucet(){if(!this.c)return;const t=this.c.currentTime;this.tone(700,0.28,'sine',0.1,1300,t);this.noise(0.9,0.28,'bandpass',500,t+0.2,this.sfx,1.5);this.tone(260,0.35,'sine',0.12,150,t+0.25);},
@@ -333,7 +351,7 @@ const AU={c:null,mode:'title',step:0,next:0,T:0.3,tr:0,loops:0,
     const o=this.osc('sine',f,t,0),o2=this.osc('triangle',f*2,t,0),g2=c.createGain();g2.gain.value=0.35;o.connect(g);o2.connect(g2);g2.connect(g);o.start(t);o2.start(t);o.stop(t+dur+1.1);o2.stop(t+dur+1.1);
     g.connect(this.mus);
   },
-  boom(t,v){this.tone(90,0.7,'sine',v,28,t,this.mus);this.noise(0.4,v*0.15,'lowpass',200,t,this.mus);},
+  boom(t,v){this.tone(90,0.7,'sine',v,28,t,this.mus);this.tone(180,0.25,'triangle',v*0.15,60,t,this.mus);},
   bell(f,t,v){
     const c=this.c,g=c.createGain();g.gain.setValueAtTime(0.0001,t);g.gain.exponentialRampToValueAtTime(v,t+0.003);g.gain.exponentialRampToValueAtTime(0.0001,t+1.4);
     for(const [m,a] of [[1,1],[2.76,0.35],[5.4,0.12]]){const o=this.osc('sine',f*m,t,0),og=c.createGain();og.gain.value=a;o.connect(og);og.connect(g);o.start(t);o.stop(t+1.45);}
@@ -355,26 +373,23 @@ const AU={c:null,mode:'title',step:0,next:0,T:0.3,tr:0,loops:0,
     const o=this.osc('sawtooth',f,t,0);o.connect(fl);fl.connect(g);g.connect(this.mus);o.start(t);o.stop(t+dur+0.05);
   },
   swell(dur,t,v){
-    const c=this.c,s=c.createBufferSource();s.buffer=this.nb;s.loop=true;const fl=c.createBiquadFilter();fl.type='lowpass';fl.Q.value=4;
-    fl.frequency.setValueAtTime(300,t);fl.frequency.linearRampToValueAtTime(1600,t+dur*0.6);fl.frequency.linearRampToValueAtTime(300,t+dur);
-    const g=c.createGain();g.gain.setValueAtTime(0.0001,t);g.gain.linearRampToValueAtTime(v,t+dur*0.6);g.gain.linearRampToValueAtTime(0.0001,t+dur);
-    s.connect(fl);fl.connect(g);g.connect(this.mus);s.start(t);s.stop(t+dur+0.05);
+    const c=this.c,o=c.createOscillator(),o2=c.createOscillator(),g=c.createGain();o.type='sine';o2.type='sine';
+    o.frequency.setValueAtTime(220,t);o.frequency.linearRampToValueAtTime(330,t+dur*0.6);o.frequency.linearRampToValueAtTime(220,t+dur);
+    o2.frequency.setValueAtTime(330,t);o2.frequency.linearRampToValueAtTime(495,t+dur*0.6);o2.frequency.linearRampToValueAtTime(330,t+dur);
+    g.gain.setValueAtTime(0.0001,t);g.gain.linearRampToValueAtTime(v*0.6,t+dur*0.6);g.gain.linearRampToValueAtTime(0.0001,t+dur);
+    o.connect(g);o2.connect(g);g.connect(this.mus);g.connect(this.rev);o.start(t);o2.start(t);o.stop(t+dur+0.05);o2.stop(t+dur+0.05);
   },
   // 고조 상승음(마디 끝 쓸어올림)
   riser(dur,t,v){
-    const c=this.c,s=c.createBufferSource();s.buffer=this.nb;s.loop=true;const fl=c.createBiquadFilter();fl.type='bandpass';fl.Q.value=3;
-    fl.frequency.setValueAtTime(400,t);fl.frequency.exponentialRampToValueAtTime(6000,t+dur);
-    const g=c.createGain();g.gain.setValueAtTime(0.0001,t);g.gain.exponentialRampToValueAtTime(v,t+dur);g.gain.linearRampToValueAtTime(0.0001,t+dur+0.05);
-    s.connect(fl);fl.connect(g);g.connect(this.mus);s.start(t);s.stop(t+dur+0.1);
-    const o=this.osc('sawtooth',220,t,0),og=c.createGain();o.frequency.exponentialRampToValueAtTime(1320,t+dur);
-    og.gain.setValueAtTime(0.0001,t);og.gain.exponentialRampToValueAtTime(v*0.25,t+dur);og.gain.linearRampToValueAtTime(0.0001,t+dur+0.05);
-    o.connect(og);og.connect(this.mus);o.start(t);o.stop(t+dur+0.1);
+    const c=this.c,g=c.createGain();g.gain.setValueAtTime(0.0001,t);g.gain.exponentialRampToValueAtTime(v*0.35,t+dur);g.gain.linearRampToValueAtTime(0.0001,t+dur+0.05);
+    for(const m of [1,1.5,2]){const o=this.osc('triangle',220*m,t,0);o.frequency.exponentialRampToValueAtTime(880*m,t+dur);o.connect(g);o.start(t);o.stop(t+dur+0.1);}
+    g.connect(this.mus);
   },
   kick(t,v){this.tone(150,0.2,'sine',v||0.9,42,t,this.mus);},
-  snare(t,v){this.noise(0.18,v*0.8,'bandpass',1200,t,this.mus,0.6);this.tone(200,0.12,'triangle',v*0.9,130,t,this.mus);},
+  snare(t,v){this.tone(220,0.14,'triangle',v*0.9,140,t,this.mus);this.tone(330,0.1,'sine',v*0.4,200,t,this.mus);this.noise(0.08,v*0.18,'bandpass',1800,t,this.mus,1.2);},
   conga(t,v,low){const f=low?190:290;this.tone(f,0.16,'sine',v,f*0.72,t,this.mus);this.tone(f*1.5,0.05,'triangle',v*0.25,f,t,this.mus);},
   tom(t,f){this.tone(f,0.25,'sine',0.45,f*0.6,t,this.mus);},
-  crash(t){this.noise(1.4,0.12,'bandpass',3200,t,this.mus,0.4);this.tone(98,0.6,'sine',0.35,60,t,this.mus);},
+  crash(t){for(const [f,a] of [[1046,0.05],[1318,0.04],[1568,0.035],[2093,0.025]])this.tone(f,1.2,'sine',a,f*0.98,t,this.mus);this.tone(98,0.6,'sine',0.35,60,t,this.mus);},
   tension(){
     const ph=G.phase;
     if(ph==='ready')return 0.05;
@@ -389,6 +404,9 @@ const AU={c:null,mode:'title',step:0,next:0,T:0.3,tr:0,loops:0,
     const hb=G.screen==='play'&&G.phase==='flow'&&!G.fast,quiet=hb||(G.screen==='play'&&G.phase==='leak');
     this.heartbeat(hb);
     if(quiet){this.mus.gain.setTargetAtTime(0,this.c.currentTime,0.5);this.next=Math.max(this.next,this.c.currentTime+0.05);return;}
+    // 승리 음악(빨리빨리·성공·칭찬 타임·팡파르) 동안엔 효과음을 작게
+    const win=this.mode==='triumph'||(G.screen==='play'&&(G.phase==='saving'||G.phase==='tally'||G.phase==='won'));
+    this.sfx.gain.setTargetAtTime(win?0.3:1,this.c.currentTime,0.25);
     if(!this.mode)return;const pat=MUS[this.mode];
     if(pat.build&&G.screen==='play')this.T+=(this.tension()-this.T)*0.03;else this.T=pat.T;
     const Tu=Math.max(this.T,pat.Tmin||0);
@@ -460,15 +478,15 @@ const AU={c:null,mode:'title',step:0,next:0,T:0.3,tr:0,loops:0,
     if(T>=0.75&&i===48)this.riser(st*16,t,0.12+0.08*T);
     if((T>=0.8&&s===0)||(T>=0.5&&i===0))this.crash(t);
   },
-  place(){this.tone(rnd(300,340),0.14,'triangle',0.22,160);this.noise(0.08,0.12,'lowpass',700);},
-  puff(){this.noise(0.25,0.4,'lowpass',900);this.tone(180,0.15,'sawtooth',0.08,60);},
+  place(){this.tone(rnd(300,340),0.14,'triangle',0.22,160);this.tone(rnd(600,680),0.08,'sine',0.08,400);},
+  puff(){this.tone(320,0.2,'triangle',0.2,120);this.tone(180,0.25,'sine',0.25,70);},
   bump(){this.tone(150,0.08,'square',0.07,90);},
   click(){this.tone(520,0.09,'sine',0.16,820);},
   tick(sec){const n=mf(72+(5-(sec||5))*2);this.tone(n,0.35,'sine',0.2);this.tone(n*2,0.2,'triangle',0.05);},
-  whoosh(){this.noise(0.7,0.35,'bandpass',900,0,0,0.7);},
+  whoosh(){if(!this.c)return;const t=this.c.currentTime;this.tone(300,0.5,'sine',0.14,900,t);this.tone(450,0.5,'triangle',0.06,1350,t+0.05);},
   glug(){this.tone(rnd(260,340),0.09,'sine',0.14,180);},
   bonus(){if(!this.c)return;const t=this.c.currentTime;[76,79,84].forEach((n,i)=>this.tone(mf(n),0.12,'square',0.08,0,t+i*0.07));},
-  leak(){this.noise(1.0,0.4,'highpass',1500);this.tone(420,0.6,'sawtooth',0.08,110);},
+  leak(){if(!this.c)return;const t=this.c.currentTime;for(let k=0;k<6;k++)this.tone(rnd(700,1100),0.18,'sine',0.08,rnd(300,500),t+k*0.09);this.tone(420,0.6,'triangle',0.1,110,t);},
   fanfare(){if(!this.c)return;let t=this.c.currentTime+0.05;
     for(const [n,d] of [[69,.14],[74,.14],[78,.14],[81,.32],[78,.14],[81,.8]]){this.brass(mf(n),d,t,0.11);this.brass(mf(n-12),d,t,0.07);t+=d;}
     const e=t-0.8;this.crash(e);this.kick(e);for(const n of [62,66,69,74])this.pad(mf(n),1.8,e,3);},
@@ -2068,9 +2086,9 @@ function update(dt){
   G.fx=G.fx.filter(p=>p.life<p.max);if(G.fx.length>500)G.fx.splice(0,G.fx.length-500);
   if(AU.c){
     const t=AU.c.currentTime,I=G.concept.scene.intensity;
-    const wv=G.phase==='flow'?(G.fast?0.25:0.13):(G.phase==='saving'||G.phase==='leak')?0.32:0;
-    AU.waterG.gain.setTargetAtTime(wv,t,0.1);AU.fireG.gain.setTargetAtTime(G.concept.fireSound?I*0.35:0,t,0.3);
-    if(G.concept.fireSound){if(Math.random()<I*dt*3)AU.crackle(rnd(0.05,0.12)*I);}
+    const wv=(G.phase==='saving'||G.phase==='leak')?0.12:0;
+    AU.waterG.gain.setTargetAtTime(wv,t,0.1);const calm=G.phase!=='flow';AU.fireG.gain.setTargetAtTime(G.concept.fireSound&&calm?I*0.1:0,t,0.3);
+    if(G.concept.fireSound&&calm){if(Math.random()<I*dt*1.5)AU.crackle(rnd(0.03,0.06)*I);}
     else if(G.concept.id==='garden'&&G.phase!=='lost'&&Math.random()<dt*(G.phase==='won'?1.2:0.35))AU.chirp(AU.c.currentTime,0.05,AU.sfx);
   }
 }
