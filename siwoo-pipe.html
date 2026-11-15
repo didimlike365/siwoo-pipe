@@ -2112,9 +2112,8 @@ function drawHUD(){
     txt(String(sec),cx,cy+Math.min(s.h*0.42,s.w*0.3)*0.08,big,col,{font:FT,stroke:'rgba(0,0,0,0.8)',sw:big*0.1,glow:urgent?'#ff2a00':'#5cc8ff',blur:24});
   }else if(G.phase==='flow'){pill(s.x+10,y2,G.concept.flowMsg+(G.hurry?' '+'⚡'.repeat(Math.min(G.hurry,3)):''),fs,G.hurry?'#ffd23a':'#7fd8ff');y3=y2+ph+8;}
   else if(G.phase==='saving'){pill(s.x+10,y2,G.concept.saveMsg,fs*1.1,'#ffe14d');y3=y2+ph+8;}
-  const cn=Math.max(G.connN,G.pathLen),okp=cn>=G.req,pp=1+0.35*Math.max(0,G.connPop);
-  const ph3=pill(s.x+10,y3,okp?`🔗 연결 ${cn}/${G.req} 완료!`:`🔗 연결 ${cn}/${G.req}`,fs*pp,okp?'#5dff8a':'#ffd54a');
-  let y4=y3+ph3+8;
+  drawConnGauge(s);
+  let y4=y3;
   if(G.keyTotal){const okk=G.keyPassed>=G.keyTotal,cp=G.concept;const h5=pill(s.x+10,y4,okk?`${cp.keyIcon} ${G.keyPassed}/${G.keyTotal} 완료!`:`${cp.keyIcon} ${cp.keyName} ${G.keyPassed}/${G.keyTotal}`,fs,okk?'#5dff8a':'#ffb070');y4+=h5+8;}
   if(G.oneWayTotal){const oko=G.oneWayPassed>=G.oneWayTotal;const h4=pill(s.x+10,y4,oko?`➡️ ${G.oneWayPassed}/${G.oneWayTotal} 완료!`:`➡️ 화살표 ${G.oneWayPassed}/${G.oneWayTotal}`,fs,oko?'#5dff8a':'#ffe14d');y4+=h4+8;}
   if(G.crossReq){const okc=G.crosses>=G.crossReq;pill(s.x+10,y4,okc?`✚ ${G.crosses}/${G.crossReq} 완료!`:`✚ 크로스 ${G.crosses}/${G.crossReq}`,fs,okc?'#5dff8a':'#c9a8ff');}
@@ -2156,21 +2155,34 @@ function updateConn(dt){
   if(n>G.connN&&(G.phase==='countdown'||G.phase==='flow')){
     const [r,c]=t.cells[n-1],[x,y]=cellCenter(r,c);G.connPop=1;
     if(t.reached&&!G.connReached)addFloat(x,y-14,'🎯 도착까지 연결!','#5dff8a',20);
-    else addFloat(x,y-14,`🔗 ${n}`,'#ffe14d',20);
     if(AU.c)AU.glock(mf(72+Math.min(n,24)),0.25,AU.c.currentTime,0.08);
   }
   G.conn=t.cells;G.connN=n;G.connReached=t.reached;G.connPop=Math.max(0,G.connPop-dt*3);
+}
+/* 위쪽 장면 영역의 큰 연결 게이지: 연결된 파이프 / 목표 개수 */
+function drawConnGauge(s){
+  if(G.phase==='tally'||G.phase==='won'||G.phase==='lost')return;
+  const cn=Math.max(G.connN,G.pathLen),goal=G.req||1,ok=cn>=goal,k=Math.min(1,cn/goal);
+  G.gaugeK=G.gaugeK==null?k:G.gaugeK+(k-G.gaugeK)*0.15;
+  const R=clamp(Math.min(s.h*0.2,s.w*0.12),30,72),cx=s.x+s.w-R-14,cy=s.y+s.h-R-12,pop=1+0.25*Math.max(0,G.connPop);
+  const col=ok?'#5dff8a':'#ffd23a';
+  ctx.save();
+  ctx.fillStyle='rgba(10,12,24,0.72)';ctx.beginPath();ctx.arc(cx,cy,R+6,0,7);ctx.fill();
+  ctx.lineWidth=R*0.22;ctx.strokeStyle='rgba(255,255,255,0.15)';ctx.beginPath();ctx.arc(cx,cy,R*0.82,0,7);ctx.stroke();
+  ctx.strokeStyle=col;ctx.lineCap='round';ctx.shadowColor=col;ctx.shadowBlur=ok?18:10;
+  ctx.beginPath();ctx.arc(cx,cy,R*0.82,-Math.PI/2,-Math.PI/2+Math.PI*2*Math.max(0.001,G.gaugeK));ctx.stroke();
+  ctx.restore();
+  txt('🔗 연결',cx,cy-R*0.42,Math.max(10,R*0.24),'#dfe6ff',{font:FT});
+  txt(String(cn),cx,cy+R*0.05,R*0.62*pop,col,{font:FT,stroke:'#000',sw:4,glow:ok?'#2a8a3a':null,blur:10});
+  txt(ok?'완료!':`/ ${goal}`,cx,cy+R*0.5,Math.max(10,R*0.26),ok?'#5dff8a':'#ffffff',{font:FT});
 }
 function drawConn(){
   if(!(G.phase==='countdown'||G.phase==='flow'||G.phase==='ready'))return;
   const s=LAY.grid.cell,col=G.connReached?'#5dff8a':G.concept.color,pulse=0.55+0.45*Math.sin(G.time*5);
   G.conn.forEach(([r,c],i)=>{
     const [x,y]=cellXY(r,c),last=i===G.conn.length-1;
-    ctx.save();ctx.lineWidth=last?3.5:2.5;ctx.strokeStyle=col;ctx.globalAlpha=last?1:0.55+0.35*pulse;ctx.shadowColor=col;ctx.shadowBlur=last?16:8;
+    ctx.save();ctx.lineWidth=last?3:2;ctx.strokeStyle=col;ctx.globalAlpha=last?0.9:0.35+0.25*pulse;ctx.shadowColor=col;ctx.shadowBlur=last?16:8;
     rr(ctx,x+3,y+3,s-6,s-6,8);ctx.stroke();ctx.restore();
-    const fs=Math.max(10,s*0.26),bx=x+s*0.18,by=y+s*0.18;
-    ctx.save();ctx.fillStyle=col;ctx.globalAlpha=0.92;ctx.beginPath();ctx.arc(bx,by,fs*0.68,0,7);ctx.fill();ctx.restore();
-    txt(String(i+1),bx,by+1,fs*(last?1+0.4*G.connPop:1),'#10121c',{font:FT});
   });
 }
 function drawGrid(){
