@@ -15,7 +15,12 @@ canvas{display:block;position:fixed;left:0;top:0;touch-action:none}
 <script>
 'use strict';
 /* ================= 기본 유틸 ================= */
-const cv=document.getElementById('c');const ctx=cv.getContext('2d');
+const cv=document.getElementById('c');let ctx=cv.getContext('2d');
+/* ===== 가볍게 모드(저사양 기기): 해상도 낮춤 · 빛번짐(그림자) 끔 · 배경 30fps · 음악 가볍게 ===== */
+let LITE=false;
+const liteMode=()=>SAVE.lite==='on'||(SAVE.lite!=='off'&&LITE);
+{const SBD=Object.getOwnPropertyDescriptor(CanvasRenderingContext2D.prototype,'shadowBlur');
+ Object.defineProperty(CanvasRenderingContext2D.prototype,'shadowBlur',{configurable:true,get(){return SBD.get.call(this);},set(v){SBD.set.call(this,liteMode()?0:v);}});}
 let W=0,H=0,DPR=1;
 const FT="'Black Han Sans','Jua',sans-serif", FB="'Jua','Black Han Sans',sans-serif";
 const rnd=(a,b)=>a+Math.random()*(b-a), ri=n=>Math.floor(Math.random()*n);
@@ -51,6 +56,7 @@ const SAVE=loadSave(); SAVE.best=SAVE.best||{};
 const DIFFS={easy:{name:'초보',icon:'🐣',mult:Infinity,col:'#5dd36a'},normal:{name:'중수',icon:'🙂',mult:3,col:'#3aa0ff'},hard:{name:'고수',icon:'🔥',mult:1,col:'#ff5a3a'},master:{name:'초고수',icon:'👑',mult:0.8,col:'#b040ff',master:true}};
 if(!SAVE.diff){SAVE.diff='easy';for(const k of Object.keys(SAVE.best))if(!k.includes('_')){SAVE.best[k+'_hard']=SAVE.best[k];delete SAVE.best[k];}}
 const DF=()=>DIFFS[SAVE.diff]||DIFFS.easy;
+if(!SAVE.lite)SAVE.lite='auto';LITE=!!SAVE.autoLite;
 const bestKey=cp=>cp.id+'_'+SAVE.diff;
 
 /* ================= 사운드 (모두 합성) ================= */
@@ -164,9 +170,10 @@ const AU={c:null,mode:'title',step:0,next:0,T:0.3,tr:0,loops:0,
       this.comp=c.createDynamicsCompressor();this.comp.threshold.value=-16;this.comp.ratio.value=4;this.comp.attack.value=0.004;this.comp.release.value=0.2;this.comp.connect(this.master);
       this.sfx=c.createGain();this.sfx.connect(this.comp);
       this.mus=c.createGain();this.mus.gain.value=0.4;this.mus.connect(this.comp);
+      const mkIR=sec=>{const rl=Math.floor(c.sampleRate*sec),ir=c.createBuffer(2,rl,c.sampleRate);for(let ch=0;ch<2;ch++){const d=ir.getChannelData(ch);for(let i=0;i<rl;i++)d[i]=(Math.random()*2-1)*Math.pow(1-i/rl,2.8);}return ir;};this.irLong=mkIR(2.2);this.irShort=mkIR(0.5);
       const rl=Math.floor(c.sampleRate*2.2),ir=c.createBuffer(2,rl,c.sampleRate);
       for(let ch=0;ch<2;ch++){const d=ir.getChannelData(ch);for(let i=0;i<rl;i++)d[i]=(Math.random()*2-1)*Math.pow(1-i/rl,2.8);}
-      this.rev=c.createConvolver();this.rev.buffer=ir;this.rev.connect(this.comp);
+      this.rev=c.createConvolver();this.rev.buffer=liteMode()?this.irShort:this.irLong;this.rev.connect(this.comp);
       this.revIn=c.createGain();this.revIn.gain.value=0.2;this.mus.connect(this.revIn);this.revIn.connect(this.rev);
       const len=c.sampleRate*2,b=c.createBuffer(1,len,c.sampleRate),d=b.getChannelData(0);
       for(let i=0;i<len;i++)d[i]=Math.random()*2-1;this.nb=b;
@@ -192,14 +199,14 @@ const AU={c:null,mode:'title',step:0,next:0,T:0.3,tr:0,loops:0,
     const c=this.c,g=c.createGain(),fl=c.createBiquadFilter();fl.type='lowpass';fl.Q.value=2;v=v||0.09;
     fl.frequency.setValueAtTime(500,t);fl.frequency.exponentialRampToValueAtTime(3400,t+0.04);fl.frequency.exponentialRampToValueAtTime(1500,t+0.25);
     g.gain.setValueAtTime(0.0001,t);g.gain.exponentialRampToValueAtTime(v,t+0.025);g.gain.setValueAtTime(v,t+Math.max(0.03,dur-0.05));g.gain.exponentialRampToValueAtTime(0.0001,t+dur+0.08);
-    for(const dt of [-7,7]){const o=this.osc('sawtooth',f,t,dt);o.connect(fl);o.start(t);o.stop(t+dur+0.12);}
+    for(const dt of liteMode()?[0]:[-7,7]){const o=this.osc('sawtooth',f,t,dt);o.connect(fl);o.start(t);o.stop(t+dur+0.12);}
     const o2=this.osc('square',f/2,t,0),g2=c.createGain();g2.gain.value=0.3;o2.connect(g2);g2.connect(fl);o2.start(t);o2.stop(t+dur+0.12);
     fl.connect(g);g.connect(this.mus);
   },
   pad(f,dur,t,T){
     const c=this.c,g=c.createGain(),fl=c.createBiquadFilter();fl.type='lowpass';fl.frequency.value=600+2000*T;
     const v=0.018+0.012*T;g.gain.setValueAtTime(0.0001,t);g.gain.linearRampToValueAtTime(v,t+0.2);g.gain.setValueAtTime(v,t+Math.max(0.25,dur-0.2));g.gain.linearRampToValueAtTime(0.0001,t+dur+0.1);
-    for(const dt of [-9,0,9]){const o=this.osc('sawtooth',f,t,dt);o.connect(fl);o.start(t);o.stop(t+dur+0.15);}
+    for(const dt of liteMode()?[0]:[-9,0,9]){const o=this.osc('sawtooth',f,t,dt);o.connect(fl);o.start(t);o.stop(t+dur+0.15);}
     fl.connect(g);g.connect(this.mus);
   },
   // 빠른 현악 스타카토(긴박감)
@@ -449,7 +456,7 @@ const AU={c:null,mode:'title',step:0,next:0,T:0.3,tr:0,loops:0,
     const c=this.c,fl=c.createBiquadFilter(),g=c.createGain();fl.type='lowpass';fl.Q.value=3;
     fl.frequency.setValueAtTime(350,t);fl.frequency.linearRampToValueAtTime(500+1800*T,t+dur*0.55);fl.frequency.linearRampToValueAtTime(450,t+dur+1);
     const v=0.02;g.gain.setValueAtTime(0.0001,t);g.gain.linearRampToValueAtTime(v,t+1.2);g.gain.setValueAtTime(v,t+dur);g.gain.linearRampToValueAtTime(0.0001,t+dur+1.6);
-    for(const f of fs)for(const d of [-12,12]){const o=this.osc('sawtooth',f,t,d);o.connect(fl);o.start(t);o.stop(t+dur+1.7);}
+    for(const f of fs)for(const d of liteMode()?[0]:[-12,12]){const o=this.osc('sawtooth',f,t,d);o.connect(fl);o.start(t);o.stop(t+dur+1.7);}
     fl.connect(g);g.connect(this.mus);
   },
   glass(fs,dur,t,T){
@@ -661,13 +668,13 @@ const AU={c:null,mode:'title',step:0,next:0,T:0.3,tr:0,loops:0,
     const c=this.c,g=c.createGain();g.gain.setValueAtTime(0.0001,t);g.gain.exponentialRampToValueAtTime(v,t+0.003);g.gain.exponentialRampToValueAtTime(v*0.3,t+0.12);g.gain.exponentialRampToValueAtTime(0.0001,t+0.7);
     const fl=c.createBiquadFilter();fl.type='highpass';fl.frequency.value=1800;
     for(const [m,a] of [[1,1],[1.483,0.6],[1.932,0.45],[2.546,0.3]]){const o=this.osc('sine',2600*m,t,0),og=c.createGain();og.gain.value=a;o.connect(og);og.connect(fl);o.start(t);o.stop(t+0.75);}
-    fl.connect(g);g.connect(this.mus);this.metal(t,v*0.5,0.35,6500);
+    fl.connect(g);g.connect(this.mus);if(!liteMode())this.metal(t,v*0.5,0.35,6500);
   },
   ghost(t,v){this.tone(230,0.09,'triangle',v,170,t,this.mus);this.tone(345,0.05,'sine',v*0.35,240,t,this.mus);},
   ubass(f,dur,t,v){ // 콘트라베이스: 손가락으로 튕긴 "둥" (기음 + 배음, 필터가 빠르게 닫힘)
     const c=this.c,g=c.createGain(),fl=c.createBiquadFilter();fl.type='lowpass';fl.Q.value=1.2;fl.frequency.setValueAtTime(2200,t);fl.frequency.exponentialRampToValueAtTime(520,t+0.16);
     g.gain.setValueAtTime(0.0001,t);g.gain.exponentialRampToValueAtTime(v,t+0.006);g.gain.exponentialRampToValueAtTime(v*0.42,t+0.16);g.gain.exponentialRampToValueAtTime(0.0001,t+dur+0.06);
-    for(const [ty,m,a] of [['sine',1,1],['sawtooth',1,0.42],['sine',2,0.38],['triangle',3,0.12]]){const o=this.osc(ty,f*m*1.012,t,0),og=c.createGain();o.frequency.exponentialRampToValueAtTime(f*m,t+0.035);og.gain.value=a;o.connect(og);og.connect(fl);o.start(t);o.stop(t+dur+0.1);}
+    for(const [ty,m,a] of liteMode()?[['sine',1,1],['sawtooth',1,0.5]]:[['sine',1,1],['sawtooth',1,0.42],['sine',2,0.38],['triangle',3,0.12]]){const o=this.osc(ty,f*m*1.012,t,0),og=c.createGain();o.frequency.exponentialRampToValueAtTime(f*m,t+0.035);og.gain.value=a;o.connect(og);og.connect(fl);o.start(t);o.stop(t+dur+0.1);}
     fl.connect(g);g.connect(this.mus);
   },
   rhodes(f,dur,t,v){
@@ -684,7 +691,7 @@ const AU={c:null,mode:'title',step:0,next:0,T:0.3,tr:0,loops:0,
     const fall=dur>0.55&&Math.random()<0.3;if(fall)for(const o of os){o.frequency.setValueAtTime(f,t+dur-0.12);o.frequency.exponentialRampToValueAtTime(f*0.88,t+dur+0.05);}
     lfo.frequency.value=5.4;lg.gain.setValueAtTime(0,t);lg.gain.setValueAtTime(0,t+dur*0.35);lg.gain.linearRampToValueAtTime(f*0.016,t+dur*0.9);lfo.connect(lg);for(const o of os)lg.connect(o.frequency);
     mix2.gain.value=0.5;
-    for(const [ft,fq,q,a] of [['lowpass',900,0.7,0.45],['bandpass',620,2.2,1],['bandpass',1500,3,0.55],['bandpass',2700,4,0.22]]){const bq=c.createBiquadFilter();bq.type=ft;bq.frequency.value=fq;bq.Q.value=q;const bg=c.createGain();bg.gain.value=a;mix2.connect(bq);bq.connect(bg);bg.connect(g);}
+    for(const [ft,fq,q,a] of liteMode()?[['lowpass',900,0.7,0.6],['bandpass',1500,2.5,0.7]]:[['lowpass',900,0.7,0.45],['bandpass',620,2.2,1],['bandpass',1500,3,0.55],['bandpass',2700,4,0.22]]){const bq=c.createBiquadFilter();bq.type=ft;bq.frequency.value=fq;bq.Q.value=q;const bg=c.createGain();bg.gain.value=a;mix2.connect(bq);bq.connect(bg);bg.connect(g);}
     const sw2=dur>0.5;g.gain.setValueAtTime(0.0001,t);g.gain.linearRampToValueAtTime(v*(sw2?0.75:1),t+0.03);if(sw2)g.gain.linearRampToValueAtTime(v,t+dur*0.7);
     g.gain.setValueAtTime(v*(sw2?1:0.9),t+Math.max(0.05,dur-0.05));g.gain.linearRampToValueAtTime(0.0001,t+dur+0.08);
     g.connect(this.mus);send.gain.value=0.25;g.connect(send);send.connect(this.rev);
@@ -693,13 +700,13 @@ const AU={c:null,mode:'title',step:0,next:0,T:0.3,tr:0,loops:0,
   jpiano(f,t,v,dur){ // 어쿠스틱 재즈 피아노: 해머 타격음 + 두 줄 현(살짝 어긋나 풍성) + 댐퍼로 끊음
     const c=this.c,g=c.createGain(),fl=c.createBiquadFilter(),L=Math.min(dur,1.6);fl.type='lowpass';fl.frequency.setValueAtTime(5200,t);fl.frequency.exponentialRampToValueAtTime(1300,t+0.9);
     g.gain.setValueAtTime(0.0001,t);g.gain.exponentialRampToValueAtTime(v,t+0.004);g.gain.exponentialRampToValueAtTime(v*0.5,t+0.12);g.gain.exponentialRampToValueAtTime(v*0.22,t+Math.max(0.15,L));g.gain.setTargetAtTime(0.0001,t+Math.max(0.15,L),0.06);
-    for(const [ty,m,a,dt] of [['triangle',1,0.7,0],['triangle',1,0.45,2.5],['sine',2,0.32,0],['sine',3,0.12,0],['sine',4.02,0.06,0]]){const o=this.osc(ty,f*m,t,dt),og=c.createGain();og.gain.value=a;o.connect(og);og.connect(fl);o.start(t);o.stop(t+L+0.5);}
+    for(const [ty,m,a,dt] of liteMode()?[['triangle',1,1,0],['sine',2,0.32,0]]:[['triangle',1,0.7,0],['triangle',1,0.45,2.5],['sine',2,0.32,0],['sine',3,0.12,0],['sine',4.02,0.06,0]]){const o=this.osc(ty,f*m,t,dt),og=c.createGain();og.gain.value=a;o.connect(og);og.connect(fl);o.start(t);o.stop(t+L+0.5);}
     const h=this.osc('sine',f*7,t,0),hg=c.createGain();hg.gain.setValueAtTime(0.05,t);hg.gain.exponentialRampToValueAtTime(0.0005,t+0.04);h.connect(hg);hg.connect(fl);h.start(t);h.stop(t+0.06);
     fl.connect(g);g.connect(this.mus);
   },
   metal(t,v,dec,bp){ // 사각파 6개를 겹친 금속성 울림 (심벌·하이햇)
     const c=this.c,b=c.createBiquadFilter(),h=c.createBiquadFilter(),g=c.createGain();b.type='bandpass';b.frequency.value=bp||9000;b.Q.value=0.7;h.type='highpass';h.frequency.value=5000;
-    for(const fq of [263,400,421,474,587,845]){const o=this.osc('square',fq*1.6,t,0);o.connect(b);o.start(t);o.stop(t+dec+0.02);}
+    for(const fq of liteMode()?[263,474,845]:[263,400,421,474,587,845]){const o=this.osc('square',fq*1.6,t,0);o.connect(b);o.start(t);o.stop(t+dec+0.02);}
     g.gain.setValueAtTime(0.0001,t);g.gain.exponentialRampToValueAtTime(v,t+0.002);g.gain.exponentialRampToValueAtTime(0.0001,t+dec);
     b.connect(h);h.connect(g);g.connect(this.mus);
   },
@@ -730,6 +737,7 @@ const AU={c:null,mode:'title',step:0,next:0,T:0.3,tr:0,loops:0,
     return this.lastChord=ch;},
   tonesAt(base,ch){const pcs=[...new Set((ch||this.chordNow()).map(n=>((n%12)+12)%12))],out=[];
     for(let o=-1;o<4;o++)for(const pc of pcs){const n=Math.floor(base/12)*12+pc+o*12;if(n>=base)out.push(n);}return out.sort((a,b)=>a-b);},
+  applyLite(){if(this.rev)this.rev.buffer=liteMode()?this.irShort:this.irLong;},
   click(){this.tone(520,0.09,'sine',0.16,820);},
   tick(sec){const ns=this.c?this.tonesAt(72):[72,76,79,84,88],n=mf(ns[clamp(5-(sec||5),0,ns.length-1)]);this.tone(n,0.35,'sine',0.2);this.tone(n*2,0.2,'triangle',0.05);},
   whoosh(){if(!this.c)return;const t=this.c.currentTime;this.tone(300,0.5,'sine',0.14,900,t);this.tone(450,0.5,'triangle',0.06,1350,t+0.05);},
@@ -2789,7 +2797,7 @@ function layout(){
   spriteCache={};
 }
 function viewSize(){const vv=window.visualViewport;return [Math.round(vv?vv.width:window.innerWidth),Math.round(vv?vv.height:window.innerHeight)];}
-function resize(){DPR=Math.min(2,window.devicePixelRatio||1);[W,H]=viewSize();
+function resize(){[W,H]=viewSize();DPR=liteMode()?1:Math.min(2,window.devicePixelRatio||1);while(!liteMode()&&DPR>1&&W*H*DPR*DPR>3.2e6)DPR=Math.max(1,DPR-0.25);SC.cv=null;
   cv.style.width=W+'px';cv.style.height=H+'px';cv.width=Math.round(W*DPR);cv.height=Math.round(H*DPR);layout();}
 
 /* ================= 파이프 그리기 ================= */
@@ -3086,10 +3094,16 @@ function drawOverlay(){
     button(b.x+100,b.y+6,b.w-124,58,'🔄 다시 도전','#2a9df4',()=>{G.score=G.levelStartScore;startLevel(G.level,true);},{size:24,glow:true});
   }
 }
+const SC={cv:null};
+function setLite(on){LITE=on;resize();spriteCache={};if(AU.c)AU.applyLite();}
 function drawPlay(){
   ctx.fillStyle='#0b0e1c';ctx.fillRect(0,0,W,H);
   ctx.save();if(G.shake>0)ctx.translate(rnd(-6,6)*G.shake,rnd(-6,6)*G.shake);
-  G.concept.scene.draw(ctx,LAY.scene,G);
+  if(liteMode()){const sr=LAY.scene;
+    if(!SC.cv||SC.w!==sr.w||SC.h!==sr.h){SC.cv=document.createElement('canvas');SC.cv.width=Math.round(sr.w*DPR);SC.cv.height=Math.round(sr.h*DPR);SC.w=sr.w;SC.h=sr.h;SC.c=SC.cv.getContext('2d');SC.n=0;}
+    if(SC.n++%2===0){const m=ctx;ctx=SC.c;ctx.setTransform(DPR,0,0,DPR,0,0);ctx.clearRect(0,0,sr.w,sr.h);try{G.concept.scene.draw(ctx,{x:0,y:0,w:sr.w,h:sr.h},G);}finally{ctx=m;}}
+    ctx.drawImage(SC.cv,sr.x,sr.y,sr.w,sr.h);
+  }else G.concept.scene.draw(ctx,LAY.scene,G);
   if(G.phase==='tally'||G.phase==='won')drawTally();
   drawHUD();drawQueue();drawGrid();if(G.phase==='tally')drawTallyGrid();drawFx();
   ctx.restore();
@@ -3148,6 +3162,8 @@ function drawTitle(){
     CONCEPTS.forEach((cp,i)=>drawCard(cp,gx0+(i%cols)*(cw+gap),y0+Math.floor(i/cols)*(ch+gap),cw,ch,false));y0+=rows*(ch+gap);}
   else{const cols=3,rows=Math.ceil(NC/cols),cw=Math.min((W-64)/cols,300),ch=clamp((H-y0-16)/rows-12,80,180);CONCEPTS.forEach((cp,i)=>drawCard(cp,(W-(cw*cols+16*(cols-1)))/2+(i%cols)*(cw+16),y0+Math.floor(i/cols)*(ch+12),cw,ch,false));y0+=rows*(ch+12);}
   button(W-58,10,48,48,SAVE.muted?'🔇':'🔊','#3a3f5a',toggleMute,{size:20});
+  {const lab=SAVE.lite==='on'?'🐢 가볍게':SAVE.lite==='off'?'✨ 고화질':(liteMode()?'🐢 자동(가볍게)':'⚙ 자동');
+   button(10,10,Math.min(150,W*0.36),48,lab,SAVE.lite==='on'||liteMode()?'#2a7a8a':'#3a3f5a',()=>{SAVE.lite=SAVE.lite==='auto'?'on':SAVE.lite==='on'?'off':'auto';if(SAVE.lite==='off')SAVE.autoLite=false;saveSave();setLite(!!SAVE.autoLite);},{size:15});}
   if(G.confirm)drawConfirm();
 }
 /* ===== 스테이지 시작 확인창 ===== */
@@ -3228,7 +3244,14 @@ function draw(){
   drawFloats();
 }
 let last=performance.now();
-function frame(now){const [vw,vh]=viewSize();if(vw!==W||vh!==H)resize();const dt=Math.min(0.05,(now-last)/1000);last=now;G.time+=dt;update(dt);draw();requestAnimationFrame(frame);}
+const PERF={a:[],t:0};
+function perfCheck(raw){
+  if(G.screen!=='play'||SAVE.lite!=='auto'||LITE||document.hidden){PERF.a.length=0;PERF.t=0;return;}
+  PERF.t+=raw;if(PERF.t<1)return;PERF.a.push(raw);if(PERF.t<3||PERF.a.length<20)return;PERF.t=1;
+  const s2=PERF.a.slice().sort((x,y)=>x-y),med=s2[s2.length>>1];PERF.a.length=0;
+  if(med>0.024){SAVE.autoLite=true;saveSave();setLite(true);const sc=LAY.scene;addFloat(sc.x+sc.w/2,sc.y+sc.h*0.5,'🐢 가볍게 모드로 바꿨어요','#9fe8ff',18);}
+}
+function frame(now){const [vw,vh]=viewSize();if(vw!==W||vh!==H)resize();const raw=(now-last)/1000,dt=Math.min(0.05,raw);last=now;if(raw<0.5)perfCheck(raw);G.time+=dt;update(dt);draw();requestAnimationFrame(frame);}
 
 /* ================= 입력 ================= */
 cv.addEventListener('pointerdown',e=>{
