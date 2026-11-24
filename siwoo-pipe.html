@@ -163,7 +163,7 @@ const AU={c:null,mode:'title',step:0,next:0,T:0.3,tr:0,loops:0,
     if(this.c){if(this.c.state==='suspended')this.c.resume();return;}
     try{
       const C=window.AudioContext||window.webkitAudioContext;if(!C)return;
-      const c=this.c=new C();
+      let c;try{c=new C({latencyHint:liteMode()?'playback':'balanced'});}catch(e){c=new C();}this.c=c;
       this.lim=c.createDynamicsCompressor();this.lim.threshold.value=-3;this.lim.knee.value=0;this.lim.ratio.value=20;this.lim.attack.value=0.001;this.lim.release.value=0.12;this.lim.connect(c.destination);
       this.hp=c.createBiquadFilter();this.hp.type='highpass';this.hp.frequency.value=55;this.hp.Q.value=0.7;this.hp.connect(this.lim);
       this.master=c.createGain();this.master.gain.value=SAVE.muted?0:0.85;this.master.connect(this.hp);
@@ -171,13 +171,11 @@ const AU={c:null,mode:'title',step:0,next:0,T:0.3,tr:0,loops:0,
       this.sfx=c.createGain();this.sfx.connect(this.comp);
       this.mus=c.createGain();this.mus.gain.value=0.4;this.mus.connect(this.comp);
       const mkIR=sec=>{const rl=Math.floor(c.sampleRate*sec),ir=c.createBuffer(2,rl,c.sampleRate);for(let ch=0;ch<2;ch++){const d=ir.getChannelData(ch);for(let i=0;i<rl;i++)d[i]=(Math.random()*2-1)*Math.pow(1-i/rl,2.8);}return ir;};this.irLong=mkIR(2.2);this.irShort=mkIR(0.5);
-      const rl=Math.floor(c.sampleRate*2.2),ir=c.createBuffer(2,rl,c.sampleRate);
-      for(let ch=0;ch<2;ch++){const d=ir.getChannelData(ch);for(let i=0;i<rl;i++)d[i]=(Math.random()*2-1)*Math.pow(1-i/rl,2.8);}
       this.rev=c.createConvolver();this.rev.buffer=liteMode()?this.irShort:this.irLong;this.rev.connect(this.comp);
       this.revIn=c.createGain();this.revIn.gain.value=0.2;this.mus.connect(this.revIn);this.revIn.connect(this.rev);
       const len=c.sampleRate*2,b=c.createBuffer(1,len,c.sampleRate),d=b.getChannelData(0);
       for(let i=0;i<len;i++)d[i]=Math.random()*2-1;this.nb=b;
-      this.waterG=this.loop('bandpass',650,0.6);this.fireG=this.loop('lowpass',380,0.7);
+      this.waterG=c.createGain();this.fireG=c.createGain(); // 잡음 루프 대신 빈 볼륨 노드
       this.next=c.currentTime+0.05;
     }catch(e){this.c=null;}
   },
@@ -186,14 +184,10 @@ const AU={c:null,mode:'title',step:0,next:0,T:0.3,tr:0,loops:0,
     if(!this.c)return;const c=this.c,t=when||c.currentTime;const o=c.createOscillator(),g=c.createGain();
     o.type=type||'square';o.frequency.setValueAtTime(f,t);if(slide)o.frequency.exponentialRampToValueAtTime(slide,t+dur);
     g.gain.setValueAtTime(0.0001,t);g.gain.exponentialRampToValueAtTime(vol||0.1,t+0.008);g.gain.exponentialRampToValueAtTime(0.0001,t+dur);
-    o.connect(g);g.connect(dest||this.sfx);o.start(t);o.stop(t+dur+0.03);
+    if(o.type==='square'||o.type==='sawtooth'){const lp=c.createBiquadFilter();lp.type='lowpass';lp.frequency.value=Math.min(3200,f*6);o.connect(lp);lp.connect(g);}else o.connect(g); // 각진 파형은 부드럽게
+    g.connect(dest||this.sfx);o.start(t);o.stop(t+dur+0.03);
   },
-  noise(dur,vol,type,f,when,dest,q){
-    if(!this.c)return;const c=this.c,t=when||c.currentTime;const s=c.createBufferSource();s.buffer=this.nb;
-    const fl=c.createBiquadFilter();fl.type=type||'lowpass';fl.frequency.value=f||1000;fl.Q.value=q||1;
-    const g=c.createGain();g.gain.setValueAtTime(vol,t);g.gain.exponentialRampToValueAtTime(0.0001,t+dur);
-    s.connect(fl);fl.connect(g);g.connect(dest||this.sfx);s.start(t,Math.random()*1.5,dur+0.05);
-  },
+  noise(){ /* 잡음 소리 사용 안 함 */ },
   osc(type,f,t,det){const o=this.c.createOscillator();o.type=type;o.frequency.setValueAtTime(f,t);if(det)o.detune.setValueAtTime(det,t);return o;},
   brass(f,dur,t,v){
     const c=this.c,g=c.createGain(),fl=c.createBiquadFilter();fl.type='lowpass';fl.Q.value=2;v=v||0.09;
@@ -266,8 +260,8 @@ const AU={c:null,mode:'title',step:0,next:0,T:0.3,tr:0,loops:0,
   clap(t,v){this.tone(1100,0.05,'triangle',v*0.35,700,t,this.mus);this.tone(1500,0.04,'sine',v*0.25,900,t+0.012,this.mus);this.kick(t,v*0.25);},
   // 새소리 "찌르르"
   chirp(t,v,dest){const ns=this.tonesAt(91);for(let k=0;k<2;k++){const tt=t+k*0.11,f=mf(ns[ri(3)]);this.tone(f,0.12,'sine',v,f*1.5,tt,dest||this.mus);}},
-  pump(){if(!this.c)return;const t=this.c.currentTime;this.tone(70,1.0,'sawtooth',0.12,180,t);this.noise(1.0,0.2,'lowpass',600,t,this.sfx);this.tone(900,0.15,'sine',0.08,1200,t+0.9);},
-  launch(){if(!this.c)return;const t=this.c.currentTime;this.noise(3.5,0.5,'lowpass',260,t+0.3,this.sfx,0.7);this.tone(55,3.2,'sawtooth',0.18,35,t+0.4);this.noise(2.5,0.25,'bandpass',900,t+1,this.sfx,0.5);},
+  pump(){if(!this.c)return;const t=this.c.currentTime;this.tone(90,1.0,'triangle',0.16,180,t);for(let k=0;k<6;k++){const f=mf(this.tonesAt(60)[k%3]);this.tone(f,0.1,'sine',0.07,f*1.4,t+0.1+k*0.13);}this.tone(900,0.15,'sine',0.08,1200,t+0.9);},
+  launch(){if(!this.c)return;const t=this.c.currentTime;this.tone(80,3.2,'triangle',0.2,60,t+0.3);this.tone(160,3.0,'sine',0.08,120,t+0.4);this.tone(220,2.2,'sine',0.05,880,t+1);this.tone(330,2.2,'sine',0.03,1320,t+1.1);},
   hurry(){if(!this.c)return;const t=this.c.currentTime,ns=this.tonesAt(72);[[ns[0],0],[ns[1],0.09],[ns[2],0.18],[ns[3],0.27],[ns[3],0.45]].forEach(([n,d])=>this.brass(mf(n),0.12,t+d,0.12));this.sirenChop(mf(ns[3]),0.35,t+0.45,0.08);},
   ding(i){if(!this.c)return;const t=this.c.currentTime,ns=this.tonesAt(72);this.glock(mf(ns[Math.min(i,ns.length-3)]),0.5,t,0.22);this.glock(mf(ns[Math.min(i,ns.length-3)+2]),0.6,t+0.08,0.16);},
   ttabong(){if(!this.c)return;const t=this.c.currentTime,ns=this.tonesAt(70);for(const n of ns.slice(0,4))this.brass(mf(n),0.7,t,0.07);this.crash(t);this.kick(t);this.glock(mf(ns[0]+24),0.8,t+0.1,0.15);},
@@ -320,7 +314,8 @@ const AU={c:null,mode:'title',step:0,next:0,T:0.3,tr:0,loops:0,
     for(const d of [this.hbDrone,this.hbTrem]){if(!d)continue;d.g.gain.cancelScheduledValues(now);d.g.gain.setValueAtTime(d.g.gain.value,now);d.g.gain.linearRampToValueAtTime(0,now+0.6);for(const o of d.os)o.stop(now+0.7);}
     this.hbDrone=null;this.hbTrem=null;
   },
-  faucet(){if(!this.c)return;const t=this.c.currentTime;this.tone(700,0.28,'sine',0.1,1300,t);this.noise(0.9,0.28,'bandpass',500,t+0.2,this.sfx,1.5);this.tone(260,0.35,'sine',0.12,150,t+0.25);},
+  faucet(){if(!this.c)return;const t=this.c.currentTime;this.tone(700,0.28,'sine',0.1,1300,t);const ns=this.tonesAt(67);for(let k=0;k<7;k++){const f=mf(ns[ri(4)]);this.tone(f,0.09,'sine',0.08,f*1.5,t+0.25+k*0.09);}this.tone(260,0.35,'sine',0.12,150,t+0.25);},
+  bubble(v){if(!this.c)return;const t=this.c.currentTime,f=mf(this.tonesAt(72)[ri(4)]);this.tone(f,0.08,'sine',v||0.05,f*1.6,t);},
   // ===== 5536 등원길 음악 전용 (리코더·실로폰·튜바 행진곡) =====
   kinderStep(i,t,pat,st,T,ch,tr,s,bar){
     const root=ch[0];
@@ -396,7 +391,7 @@ const AU={c:null,mode:'title',step:0,next:0,T:0.3,tr:0,loops:0,
     if(s%4===0||(T>=0.7&&s%2===0))this.tone(880,0.12,'sine',0.045+0.03*T,0,t,this.mus);
     // 부드러운 북
     if(s===0||s===8)this.kick(t,0.45+0.2*T);
-    if(T>=0.5&&(s===4||s===12))this.noise(0.18,0.08+0.06*T,'lowpass',2200,t,this.mus,0.6);
+    if(T>=0.5&&(s===4||s===12))this.ghost(t,0.08+0.06*T);
     if(T>=0.65)this.stab(mf(ch[[0,2,1,2][s%4]]),st*0.6,t,0.018);
     if(T>=0.75&&i===48)this.riser(st*16,t,0.08+0.06*T);
     if(Math.random()<0.04)this.bell(mf(ch[ri(3)]+24),t,0.025);
@@ -413,7 +408,7 @@ const AU={c:null,mode:'title',step:0,next:0,T:0.3,tr:0,loops:0,
     if(s===0){for(const n of ch)this.pad(mf(n-12),st*16,t,T*0.6);this.drone(mf(ch[0]-24),st*16,t);}
     const sc=[62,63,67,69,70,74,75,79].map(n=>n+tr);
     if(s%2===0||(T>=0.6&&s%2===1)){const ar=[0,1,2,3,4,3,2,1][(s>>1)%8],kn=ch[ar%3]+12*Math.floor(ar/3);this.koto(mf(kn),t,(0.09+0.05*T)*(s%4===0?1:0.7));}
-    const ld=LEAD[this.mode][i];if(ld&&T>=0.3){const f=mf(ld[0]+tr);this.theremin(f*0.98,f,st*ld[1],t,0.05+0.04*T);this.noise(st*ld[1]*0.8,0.015,'bandpass',f*2,t,this.mus,3);}
+    const ld=LEAD[this.mode][i];if(ld&&T>=0.3){const f=mf(ld[0]+tr);this.theremin(f*0.98,f,st*ld[1],t,0.05+0.04*T);}
     if(T>=0.2&&(s===0||(T>=0.5&&(s===6||s===10))))this.boom(t,s===0?0.7:0.45);
     if(T>=0.65&&s%4===2)this.conga(t,0.22,s%8===6);
     if(Math.random()<0.04)this.bell(mf(ch[ri(ch.length)]+24),t,0.03);
@@ -450,7 +445,7 @@ const AU={c:null,mode:'title',step:0,next:0,T:0.3,tr:0,loops:0,
     // 숨결 같은 바람 소리, 마지막엔 상승음
     if(i===32&&T>=0.3)this.swell(st*16,t,0.06+0.04*T);
     if(T>=0.75&&i===48)this.riser(st*16,t,0.1+0.08*T);
-    if(T>=0.5&&i===0)this.noise(2.5,0.08,'bandpass',4000,t,this.mus,0.3);
+    if(T>=0.5&&i===0)this.glass(ch.map(n=>mf(n+24)),st*8,t,0.3);
   },
   spacePad(fs,dur,t,T){
     const c=this.c,fl=c.createBiquadFilter(),g=c.createGain();fl.type='lowpass';fl.Q.value=3;
@@ -505,7 +500,7 @@ const AU={c:null,mode:'title',step:0,next:0,T:0.3,tr:0,loops:0,
     g.connect(this.mus);
   },
   kick(t,v){this.tone(150,0.2,'sine',(v||0.9)*0.85,58,t,this.mus);},
-  snare(t,v){this.tone(220,0.14,'triangle',v*0.9,140,t,this.mus);this.tone(330,0.1,'sine',v*0.4,200,t,this.mus);this.noise(0.08,v*0.18,'bandpass',1800,t,this.mus,1.2);},
+  snare(t,v){this.tone(220,0.14,'triangle',v*0.9,140,t,this.mus);this.tone(330,0.1,'sine',v*0.4,200,t,this.mus);},
   conga(t,v,low){const f=low?190:290;this.tone(f,0.16,'sine',v,f*0.72,t,this.mus);this.tone(f*1.5,0.05,'triangle',v*0.25,f,t,this.mus);},
   tom(t,f){this.tone(f,0.25,'sine',0.45,f*0.6,t,this.mus);},
   crash(t,ch){const ns=this.tonesAt(84,ch),A=[0.05,0.04,0.035,0.025];ns.slice(0,4).forEach((n,k)=>{const f=mf(n);this.tone(f,1.2,'sine',A[k],f*0.995,t,this.mus);});const r=mf(this.tonesAt(31,ch)[0]);this.tone(r,0.6,'sine',0.35,r*0.62,t,this.mus);},
@@ -532,7 +527,7 @@ const AU={c:null,mode:'title',step:0,next:0,T:0.3,tr:0,loops:0,
     this.mus.gain.setTargetAtTime((0.34+0.26*Tu)*(pat.gain||1),this.c.currentTime,0.4);
     const bpm=pat.bpmFn?pat.bpmFn(Tu):pat.build?pat.bpm0+pat.bpmR*Tu:pat.bpm,st=60/bpm/4;
     if(this.next<this.c.currentTime-0.3)this.next=this.c.currentTime+0.05;
-    while(this.next<this.c.currentTime+0.15){this.playStep(this.step,this.next,pat,st);this.next+=st;this.step=(this.step+1)%(pat.len||64);}
+    while(this.next<this.c.currentTime+(liteMode()?0.35:0.2)){this.playStep(this.step,this.next,pat,st);this.next+=st;this.step=(this.step+1)%(pat.len||64);}
   },
   playStep(i,t,pat,st){
     const T=Math.max(this.T,pat.Tmin||0),play=!!pat.build,s=i%16,bar=Math.floor(i/16);this.curStep=i;
@@ -668,7 +663,7 @@ const AU={c:null,mode:'title',step:0,next:0,T:0.3,tr:0,loops:0,
     const c=this.c,g=c.createGain();g.gain.setValueAtTime(0.0001,t);g.gain.exponentialRampToValueAtTime(v,t+0.003);g.gain.exponentialRampToValueAtTime(v*0.3,t+0.12);g.gain.exponentialRampToValueAtTime(0.0001,t+0.7);
     const fl=c.createBiquadFilter();fl.type='highpass';fl.frequency.value=1800;
     for(const [m,a] of [[1,1],[1.483,0.6],[1.932,0.45],[2.546,0.3]]){const o=this.osc('sine',2600*m,t,0),og=c.createGain();og.gain.value=a;o.connect(og);og.connect(fl);o.start(t);o.stop(t+0.75);}
-    fl.connect(g);g.connect(this.mus);if(!liteMode())this.metal(t,v*0.5,0.35,6500);
+    fl.connect(g);g.connect(this.mus);
   },
   ghost(t,v){this.tone(230,0.09,'triangle',v,170,t,this.mus);this.tone(345,0.05,'sine',v*0.35,240,t,this.mus);},
   ubass(f,dur,t,v){ // 콘트라베이스: 손가락으로 튕긴 "둥" (기음 + 배음, 필터가 빠르게 닫힘)
@@ -710,7 +705,7 @@ const AU={c:null,mode:'title',step:0,next:0,T:0.3,tr:0,loops:0,
     g.gain.setValueAtTime(0.0001,t);g.gain.exponentialRampToValueAtTime(v,t+0.002);g.gain.exponentialRampToValueAtTime(0.0001,t+dec);
     b.connect(h);h.connect(g);g.connect(this.mus);
   },
-  hat(t,v){this.metal(t,v,0.06,10000);},
+  hat(t,v){const c=this.c,g=c.createGain();g.gain.setValueAtTime(0.0001,t);g.gain.exponentialRampToValueAtTime(v*0.6,t+0.004);g.gain.exponentialRampToValueAtTime(0.0001,t+0.07);for(const f of [3900,5300]){const o=this.osc('sine',f,t,0);o.connect(g);o.start(t);o.stop(t+0.08);}g.connect(this.mus);},
   muteTp(f,dur,t,v){
     const c=this.c,bp=c.createBiquadFilter(),g=c.createGain(),lfo=c.createOscillator(),lg=c.createGain(),send=c.createGain();
     bp.type='bandpass';bp.Q.value=2.2;bp.frequency.setValueAtTime(800,t);bp.frequency.linearRampToValueAtTime(1700,t+0.09);
@@ -749,8 +744,7 @@ const AU={c:null,mode:'title',step:0,next:0,T:0.3,tr:0,loops:0,
     const e=t-0.8;this.crash(e,[62,66,69]);this.kick(e);for(const n of [62,66,69,74])this.pad(mf(n),1.8,e,1.2);},
   lose(){if(!this.c)return;const t=this.c.currentTime+0.02;[67,64,60,55].forEach((n,i)=>this.tone(mf(n),0.32,'triangle',0.18,0,t+i*0.26));},
   siren(sec){if(!this.c)return;const t=this.c.currentTime;const ns=this.tonesAt(72);let j=ns.findIndex(n=>n>=79);if(j<1)j=1;for(let k=0;k<Math.round(sec/1.1);k++)this.sirenVoice(mf(ns[j]),mf(ns[j-1]),1.1,t+k*1.1,0.07,this.sfx);},
-  crackle(v){if(!this.c)return;const t=this.c.currentTime,s=this.c.createBufferSource();s.buffer=this.nb;const fl=this.c.createBiquadFilter();fl.type='bandpass';fl.frequency.value=rnd(350,700);fl.Q.value=0.8;
-    const g=this.c.createGain(),d=rnd(0.2,0.4);g.gain.setValueAtTime(0.0001,t);g.gain.linearRampToValueAtTime(v*1.6,t+d*0.35);g.gain.linearRampToValueAtTime(0.0001,t+d);s.connect(fl);fl.connect(g);g.connect(this.sfx);s.start(t,Math.random()*1.5,d+0.05);}
+  crackle(){},
 };
 
 /* ================= 파이프 정의 ================= */
@@ -3233,7 +3227,7 @@ function update(dt){
   if(AU.c){
     const t=AU.c.currentTime,I=G.concept.scene.intensity;
     const wv=(G.phase==='saving'||G.phase==='leak')?0.12:0;
-    AU.waterG.gain.setTargetAtTime(wv,t,0.1);const calm=G.phase!=='flow';AU.fireG.gain.setTargetAtTime(G.concept.fireSound&&calm?I*0.1:0,t,0.3);
+    if(wv&&Math.random()<0.25)AU.bubble(0.04);const calm=G.phase!=='flow';AU.fireG.gain.setTargetAtTime(G.concept.fireSound&&calm?I*0.1:0,t,0.3);
     if(G.concept.fireSound&&calm){if(Math.random()<I*dt*1.5)AU.crackle(rnd(0.03,0.06)*I);}
     else if(G.concept.id==='garden'&&G.phase!=='lost'&&Math.random()<dt*(G.phase==='won'?1.2:0.35))AU.chirp(AU.c.currentTime,0.05,AU.sfx);
   }
@@ -3264,6 +3258,7 @@ cv.addEventListener('pointerdown',e=>{
 cv.addEventListener('pointerup',()=>{G.press=null;if(G.wantFS){G.wantFS=false;enterFS();}});
 cv.addEventListener('click',()=>{if(G.wantFS){G.wantFS=false;enterFS();}});
 cv.addEventListener('contextmenu',e=>e.preventDefault());
+setInterval(()=>{if(AU.c&&!document.hidden)AU.update();},50); // 화면이 버벅여도 음악 예약은 계속
 window.addEventListener('resize',resize);window.addEventListener('orientationchange',()=>setTimeout(resize,200));
 if(window.visualViewport)window.visualViewport.addEventListener('resize',resize);
 
