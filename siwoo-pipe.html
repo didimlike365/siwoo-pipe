@@ -2699,8 +2699,28 @@ function nextCell(r,c,d){
   if((d===N||d===S)&&G.wrapCols&&G.wrapCols.includes(c))return [(nr+ROWS)%ROWS,c];
   return null;
 }
+// 크로스를 쓰지 않고(칸마다 한 번씩만 지나서) 목표 개수 이상으로 도착할 수 있는지 검사
+function noCrossPath(grid,st,req,wr,wc,needK,needO,needX){
+  const seen=new Uint8Array(ROWS*COLS);let steps=0;
+  const nx=(r,c,d)=>{const nr=r+DY[d],nc=c+DX[d];if(nr>=0&&nc>=0&&nr<ROWS&&nc<COLS)return [nr,nc];if((d===E||d===WW)&&wr.includes(r))return [r,(nc+COLS)%COLS];if((d===N||d===S)&&wc.includes(c))return [(nr+ROWS)%ROWS,c];return null;};
+  needX=needX||0;
+  function go(r,c,d,len,k,o,x){
+    if(++steps>80000)return false;
+    const cell=grid[r][c];
+    if(cell.t==='G')return OPP(d)===cell.dir&&len>=req&&k>=needK&&o>=needO&&x>=needX;
+    if(cell.t==='R'||cell.t==='S')return false;
+    const key=r*COLS+c;if(seen[key])return false;
+    let outs;if(cell.t==='K'){if(d%2!==cell.dir%2)return false;outs=[d];}else if(cell.t==='O'){if(d!==cell.dir)return false;outs=[d];}else outs=[d,(d+1)%4,(d+3)%4];
+    seen[key]=1;
+    for(const od of outs){const q=nx(r,c,od);if(q&&go(q[0],q[1],od,len+1,k+(cell.t==='K'?1:0),o+(cell.t==='O'?1:0),x+(!cell.t&&od===d?1:0))){seen[key]=0;return true;}}
+    seen[key]=0;return false;
+  }
+  const p0=nx(st.r,st.c,st.dir);return p0?go(p0[0],p0[1],st.dir,0,0,0,0):false;
+}
 function genMaster(cfg){
-  const n=G.level,L=Math.min(28,12+n*2),needCross=n%3!==2,needWrap=n%3!==1;
+  const n=G.level,L=Math.min(28,12+n*2),needWrap=n%3!==1;
+  // 크로스(길이 스스로 겹치는 곳) 최소 개수: 1단계 1개 → 2~3단계 2개 → 4단계부터 3개
+  const minCross=n<=1?1:n<=3?2:3,L2=Math.max(12,L-minCross*2),maxLen=L2+5+minCross*3; // 크로스는 2칸으로 세니까 최소 길이는 그만큼 줄임
   const inb=(r,c)=>r>=0&&c>=0&&r<ROWS&&c<COLS;
   const nOne=cfg.oneWay||0,nKey=cfg.keyReq||0,nCrossReq=cfg.crossReq||0;
   for(let tries=0;tries<600;tries++){
@@ -2711,15 +2731,18 @@ function genMaster(cfg){
       if(++steps>25000)return false;
       const key=r*COLS+c,v=vis.get(key);let outs;
       if(v){if(v.cnt!==1||v.kind!=='s'||v.axis===inD%2||path.length<3)return false;outs=[inD];}
-      else{const tr=[(inD+1)%4,(inD+3)%4].sort(()=>Math.random()-0.5);outs=Math.random()<0.45?[inD,...tr]:[...tr,inD];}
+      else{const tr=[(inD+1)%4,(inD+3)%4].sort(()=>Math.random()-0.5);outs=Math.random()<0.55?[inD,...tr]:[...tr,inD];
+        // 지나온 직선 칸을 가로지를 수 있으면 그쪽을 먼저 시도 → 크로스가 자연스럽게 생김
+        if(crossN<minCross+1&&path.length>=3){const cr=outs.filter(od=>{const nr=r+DY[od],nc=c+DX[od];if(!inb(nr,nc))return false;const w=vis.get(nr*COLS+nc);return w&&w.cnt===1&&w.kind==='s'&&w.axis!==od%2;});
+          if(cr.length&&Math.random()<0.8)outs=[...cr,...outs.filter(o=>!cr.includes(o))];}}
       for(const od of outs){
         if(v){v.cnt=2;crossN++;}else vis.set(key,{cnt:1,kind:od===inD?'s':'t',axis:inD%2});
         path.push([r,c,inD,od]);
-        if(path.length>=L&&(!needCross||crossN>0)&&(!needWrap||wrapRows.size+wrapCols.size>0)&&!v){
+        if(path.length>=L2&&crossN>=minCross&&(!needWrap||wrapRows.size+wrapCols.size>0)&&!v){
           const gr=r+DY[od],gc=c+DX[od];
           if(inb(gr,gc)&&!vis.has(gr*COLS+gc)){goal=[gr,gc,OPP(od)];return true;}
         }
-        if(path.length<L+5){
+        if(path.length<maxLen){
           let nr=r+DY[od],nc=c+DX[od],ok=true,added=null;
           if(!inb(nr,nc)){
             const lanes=wrapRows.size+wrapCols.size,horiz=od===E||od===WW;
@@ -2748,9 +2771,15 @@ function genMaster(cfg){
     const pool=straight.sort(()=>Math.random()-0.5),used=[];
     const take=(cnt,t)=>{let k=0;for(const o of pool){if(k>=cnt)break;if(used.some(x=>Math.abs(x.i-o.i)<2))continue;used.push(o);grid[o.r][o.c]={t,dir:o.dir,fills:[],pt:0};k++;}return k;};
     const gotO=take(nOne,'O'),gotK=take(nKey,'K');if(gotO<nOne||gotK<nKey)continue;
-    // 미끼 빈칸 몇 개 (크로스 칸 근처는 제외 → 크로스 없이 우회 불가)
-    const near=(r,c)=>[...crossCells].some(k=>Math.abs(Math.floor(k/COLS)-r)+Math.abs(k%COLS-c)<=2);
-    let dec=3,g2=0;while(dec>0&&g2++<200){const r=ri(ROWS),c=ri(COLS);if(grid[r][c].t!=='R'||near(r,c))continue;grid[r][c]=emptyCell();dec--;}
+    // 미끼 빈칸 몇 개
+    let dec=3,g2=0;while(dec>0&&g2++<200){const r=ri(ROWS),c=ri(COLS);if(grid[r][c].t!=='R')continue;grid[r][c]=emptyCell();dec--;}
+    // 크로스는 '강제'가 아니라 '효율': 크로스 없이도 목표 개수를 채우는 길이 있어야 함.
+    // 없으면 길 옆 장애물을 조금씩 치워서 돌아가는 길을 만들어 줌 (크로스를 쓰면 파이프를 그만큼 아낌)
+    if(crossCells.size){const st0={r:sr,c:sc,dir:sd},gl0={dir:goal[2]},wr=[...usedR],wc=[...usedC];let opened=0,okAlt=noCrossPath(grid,st0,path.length,wr,wc,gotK,gotO,Math.min(nCrossReq,crossCells.size));
+      while(!okAlt&&opened<14){const cand=[];for(let r=0;r<ROWS;r++)for(let c=0;c<COLS;c++){if(grid[r][c].t!=='R')continue;if([0,1,2,3].some(d=>{const nr=r+DY[d],nc=c+DX[d];return inb(nr,nc)&&(!grid[nr][nc].t||grid[nr][nc].t==='K'||grid[nr][nc].t==='O');}))cand.push([r,c]);}
+        if(!cand.length)break;for(let k=0;k<2&&cand.length;k++){const [r,c]=cand.splice(ri(cand.length),1)[0];grid[r][c]=emptyCell();opened++;}
+        okAlt=noCrossPath(grid,st0,path.length,wr,wc,gotK,gotO,Math.min(nCrossReq,crossCells.size));}
+      if(!okAlt)continue;}
     G.grid=grid;G.start={r:sr,c:sc,dir:sd};G.goal={r:goal[0],c:goal[1],dir:goal[2]};
     G.wrapRows=[...usedR];G.wrapCols=[...usedC];G.req=path.length;G.minLen=path.length;
     G.oneWayTotal=gotO;G.keyTotal=gotK;G.masterPath=path;G.masterCross=crossCells.size;G.solution=null;return true;
@@ -3072,8 +3101,8 @@ function drawOverlay(){
     const cdTxt=isFinite(cfg.countdown)?`⏱ ${cfg.countdown}초`:'⏱ 시간 제한 없음';
     const crTxt=G.crossReq?`✚ 크로스 파이프 ${G.crossReq}개를 지나가요`:G.keyTotal?cp.keyLine(G.keyTotal):'';
     const lines=G.level===1?[cp.introShort,`🔧 파이프 ${G.req}개 이상`,crTxt,'👆 칸을 누르면 파이프가 놓여요',isFinite(cfg.countdown)?cdTxt:'💧 다 놓으면 [보내기] 버튼!'].filter(Boolean)
-      :[`🔧 파이프 ${G.req}개 이상`,crTxt,cdTxt+(cfg.rocks?` · 🚧 ${cfg.rocks}개`:''),(DF().master?'':G.level===4?'🧭 이제 방향이 바뀌어요!':''),(G.wrapRows.length||G.wrapCols.length)?'🌀 같은 색 벽끝은 서로 이어져요!':'',G.masterCross?'✚ 길이 겹치는 곳은 크로스로!':'',G.oneWayTotal?(G.level===5?'🆕 ➡️ 화살표 파이프를 꼭 지나가요! (화살표 방향으로)':`➡️ 화살표 파이프 ${G.oneWayTotal}개를 꼭 지나가요`):''].filter(Boolean);
-    if(G.level===1&&DF().master){if(G.wrapRows.length||G.wrapCols.length)lines.push('🌀 같은 색 벽끝은 서로 이어져요!');if(G.masterCross)lines.push('✚ 길이 겹치는 곳은 크로스로!');}
+      :[`🔧 파이프 ${G.req}개 이상`,crTxt,cdTxt+(cfg.rocks?` · 🚧 ${cfg.rocks}개`:''),(DF().master?'':G.level===4?'🧭 이제 방향이 바뀌어요!':''),(G.wrapRows.length||G.wrapCols.length)?'🌀 같은 색 벽끝은 서로 이어져요!':'',G.masterCross?`✚ 크로스를 쓰면 파이프 ${G.masterCross}개를 아껴요!`:'',G.oneWayTotal?(G.level===5?'🆕 ➡️ 화살표 파이프를 꼭 지나가요! (화살표 방향으로)':`➡️ 화살표 파이프 ${G.oneWayTotal}개를 꼭 지나가요`):''].filter(Boolean);
+    if(G.level===1&&DF().master){if(G.wrapRows.length||G.wrapCols.length)lines.push('🌀 같은 색 벽끝은 서로 이어져요!');if(G.masterCross)lines.push(`✚ 크로스를 쓰면 파이프 ${G.masterCross}개를 아껴요!`);}
     const b=panelBox(lines,`${G.level}단계`,fs);
     button(b.x+24,b.y+6,b.w-48,58,cp.goBtn,cp.color,()=>{G.phase='countdown';cp.startSfx();},{size:26,glow:true});
   }else if(ph==='won'){
