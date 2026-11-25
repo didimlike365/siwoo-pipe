@@ -61,7 +61,7 @@ function wrap(text,maxW,size,font){
 }
 
 /* ================= 저장 ================= */
-const APP_VER='v1.49 · 2026.11.25'; // 배포할 때마다 올림
+const APP_VER='v1.51 · 2026.11.25'; // 배포할 때마다 올림
 const STORE_KEY='siwoo-pipe-v1';
 function loadSave(){try{return JSON.parse(localStorage.getItem(STORE_KEY))||{};}catch(e){return {};}}
 function saveSave(){try{localStorage.setItem(STORE_KEY,JSON.stringify(SAVE));}catch(e){}}
@@ -2093,6 +2093,41 @@ function drawTrafficCar(c,x,yb,L,H,col,dir,brake){
   c.save();c.globalCompositeOperation='lighter';c.drawImage(glowSprite('255,240,180'),front-H*0.45,yb-H*0.87,H*0.9,H*0.9);
   c.globalAlpha=brake?1:0.6;c.drawImage(glowSprite('255,40,40'),back-H*0.4,yb-H*0.82,H*0.8,H*0.8);c.restore();
 }
+// 아빠의 미래 전기차 (오리지널 디자인): 동글동글 은색 몸체, 파란 LED 눈, 위로 열리는 문, 바퀴에서 푸른 빛. 바닥 왼쪽 끝이 (x,yb), 오른쪽이 앞
+function drawFutureCar(c,x,yb,L,H,t,o){
+  o=o||{};
+  c.fillStyle='rgba(0,0,0,0.35)';c.beginPath();c.ellipse(x+L/2,yb+0.004,L*0.55,H*0.12,0,0,7);c.fill();
+  // 바닥 푸른 조명
+  c.save();c.globalCompositeOperation='lighter';c.globalAlpha=0.55+0.25*Math.sin(t*4);c.drawImage(glowSprite('80,190,255'),x-L*0.05,yb-H*0.35,L*1.1,H*0.7);c.restore();
+  if(o.lights){c.save();c.globalCompositeOperation='lighter';const lx=x+L*0.97,ly=yb-H*0.42,bl=o.beam||L*1.3;
+    const g=c.createLinearGradient(lx,0,lx+bl,0);g.addColorStop(0,'rgba(190,230,255,0.55)');g.addColorStop(1,'rgba(190,230,255,0)');
+    c.fillStyle=g;c.beginPath();c.moveTo(lx,ly-H*0.05);c.lineTo(lx+bl,ly-H*0.3);c.lineTo(lx+bl,ly+H*0.5);c.lineTo(lx,ly+H*0.07);c.closePath();c.fill();c.restore();}
+  // 몸체: 둥근 캡슐
+  const bg=c.createLinearGradient(0,yb-H,0,yb);bg.addColorStop(0,'#f4f7fb');bg.addColorStop(0.5,'#c4ccd8');bg.addColorStop(1,'#7c8696');
+  c.fillStyle=bg;c.beginPath();c.moveTo(x+L*0.04,yb-H*0.18);c.quadraticCurveTo(x,yb-H*0.55,x+L*0.14,yb-H*0.62);
+  c.quadraticCurveTo(x+L*0.3,yb-H*1.08,x+L*0.58,yb-H*1.02);c.quadraticCurveTo(x+L*0.86,yb-H*0.95,x+L*0.98,yb-H*0.5);c.quadraticCurveTo(x+L*1.01,yb-H*0.25,x+L*0.94,yb-H*0.14);c.closePath();c.fill();
+  // 유리 캐노피 (아빠 보임)
+  c.save();c.beginPath();c.moveTo(x+L*0.24,yb-H*0.6);c.quadraticCurveTo(x+L*0.38,yb-H*0.98,x+L*0.6,yb-H*0.94);c.quadraticCurveTo(x+L*0.8,yb-H*0.86,x+L*0.84,yb-H*0.58);c.closePath();
+  c.fillStyle='#14203a';c.fill();c.clip();
+  if(o.dad){const hx=x+L*0.62,hy=yb-H*0.66+(o.bob||0),hs=H*0.22;c.fillStyle='#9a6a3c';c.beginPath();c.ellipse(hx,hy,hs,hs*0.85,0,0,7);c.fill();
+    c.beginPath();c.ellipse(hx-hs*0.6,hy-hs*0.75,hs*0.25,hs*0.2,0,0,7);c.fill();c.fillStyle='#7a5230';c.beginPath();c.ellipse(hx+hs*0.75,hy+hs*0.2,hs*0.45,hs*0.4,0,0,7);c.fill();
+    c.strokeStyle='#111';c.lineWidth=hs*0.13;c.beginPath();c.arc(hx+hs*0.22,hy-hs*0.12,hs*0.26,0,7);c.stroke();c.fillStyle='#111';c.beginPath();c.arc(hx+hs*0.22,hy-hs*0.12,hs*0.08,0,7);c.fill();}
+  c.fillStyle='rgba(170,220,255,0.25)';c.beginPath();c.ellipse(x+L*0.42,yb-H*0.84,L*0.1,H*0.05,-0.4,0,7);c.fill();c.restore();
+  // 위로 열리는 문
+  if(o.door>0){c.save();c.translate(x+L*0.3,yb-H*0.98);c.rotate(-o.door*1.1);c.fillStyle='#dfe5ee';c.beginPath();c.ellipse(L*0.2,H*0.2,L*0.22,H*0.16,0.2,0,7);c.fill();c.fillStyle='#14203a';c.beginPath();c.ellipse(L*0.2,H*0.18,L*0.16,H*0.1,0.2,0,7);c.fill();c.restore();}
+  // 몸체 옆 파란 빛줄
+  c.fillStyle='#3ad0ff';rr(c,x+L*0.1,yb-H*0.42,L*0.8,H*0.035,H*0.02);c.fill();
+  // 앞 LED 눈 (가끔 깜빡)
+  const blink=Math.sin(t*1.3)>0.97?0.25:1;c.fillStyle='#bff2ff';for(const ey of [0.52,0.36]){c.beginPath();c.ellipse(x+L*0.955,yb-H*ey,L*0.018,H*0.07*blink,0,0,7);c.fill();}
+  c.save();c.globalCompositeOperation='lighter';c.drawImage(glowSprite('80,200,255'),x+L*0.9,yb-H*0.75,H*0.6,H*0.6);c.restore();
+  // 뒤 빨간 빛줄
+  c.fillStyle=o.brake?'#ff2a2a':'#a01818';rr(c,x+L*0.01,yb-H*0.48,L*0.03,H*0.2,H*0.015);c.fill();
+  if(o.brake){c.save();c.globalCompositeOperation='lighter';c.drawImage(glowSprite('255,40,40'),x-H*0.45,yb-H*0.85,H*0.9,H*0.9);c.restore();}
+  // 바퀴: 푸른 빛 휠
+  for(const wx of [0.22,0.78]){const cx=x+L*wx,cy=yb-H*0.14,r=H*0.2;c.fillStyle='#1a1e26';c.beginPath();c.arc(cx,cy,r,0,7);c.fill();
+    c.strokeStyle='#3ad0ff';c.lineWidth=r*0.18;c.beginPath();c.arc(cx,cy,r*0.62,0,7);c.stroke();
+    c.strokeStyle='#bfefff';c.lineWidth=r*0.12;for(let k=0;k<3;k++){const a=(o.wheel||0)+k*2.094;c.beginPath();c.moveTo(cx+Math.cos(a)*r*0.15,cy+Math.sin(a)*r*0.15);c.lineTo(cx+Math.cos(a)*r*0.55,cy+Math.sin(a)*r*0.55);c.stroke();}}
+}
 function makeDadScene(){
   const S={A:2,p:[],intensity:0.3,time:0,win:0,lose:0,carP:0,wheel:0,notes:[],honk:0,arrived:false};
   S.reset=function(){S.bk={x:-1,dir:1,wait:0};S.p=[];S.intensity=0.3;S.time=0;S.win=0;S.lose=0;S.carP=0;S.wheel=0;S.notes=[];S.honk=0;S.arrived=false;S.hugSfx=false;
@@ -2321,7 +2356,7 @@ function makeDadScene(){
     if(!hide){
       const idle=(ph==='countdown'||ph==='ready')?Math.sin(t*30)*0.0012:0;
       c.save();c.translate(carX+CL/2,0);c.scale(-1,1);c.translate(-(carX+CL/2),0);
-      drawSedan(c,carX,g.lane+idle,CL,CH,'#3a7bd5',t,{dad:!(S.arrived&&S.win-S.arriveT>0.4),lights:true,brake:lost||((ph==='countdown')&&tl==='red'),wheel:S.wheel,door,bob:Math.sin(beat*Math.PI)*CH*0.02,beam:CL*(1.1+0.6*I)});c.restore();
+      drawFutureCar(c,carX,g.lane+idle,CL,CH,t,{dad:!(S.arrived&&S.win-S.arriveT>0.4),lights:true,brake:lost||((ph==='countdown')&&tl==='red'),wheel:S.wheel,door,bob:Math.sin(beat*Math.PI)*CH*0.02,beam:CL*(1.1+0.6*I)});c.restore();
       // 산 선물이 지붕 위에 쌓임
       // 선물은 지붕 위에, 간식은 조수석 쪽에
       const got=G.gotItems||[];let gi=0,si=0;for(const it of got){if(it.kind==='gift'){L.push([it.icon,carX+CL*(0.66-gi*0.12),g.lane-CH*1.1-(gi%2)*0.014,0.036,'#fff']);gi++;}
@@ -2366,20 +2401,20 @@ function makeDadScene(){
 function drawMiniDadCar(x,y,a,s){
   ctx.save();ctx.translate(x,y);ctx.rotate(a);const L=s*0.44,Wd=s*0.25;
   ctx.globalCompositeOperation='lighter';ctx.globalAlpha=0.8;
-  const g=ctx.createLinearGradient(L/2,0,L/2+s*0.55,0);g.addColorStop(0,'rgba(255,240,180,0.7)');g.addColorStop(1,'rgba(255,240,180,0)');ctx.fillStyle=g;
+  const g=ctx.createLinearGradient(L/2,0,L/2+s*0.55,0);g.addColorStop(0,'rgba(190,230,255,0.7)');g.addColorStop(1,'rgba(190,230,255,0)');ctx.fillStyle=g;
   ctx.beginPath();ctx.moveTo(L/2,-Wd*0.35);ctx.lineTo(L/2+s*0.55,-Wd*0.9);ctx.lineTo(L/2+s*0.55,Wd*0.9);ctx.lineTo(L/2,Wd*0.35);ctx.closePath();ctx.fill();
   ctx.globalAlpha=1;ctx.globalCompositeOperation='source-over';
   ctx.fillStyle='rgba(0,0,0,0.35)';rr(ctx,-L/2+2,-Wd/2+2,L,Wd,s*0.06);ctx.fill();
-  ctx.fillStyle='#3a7bd5';rr(ctx,-L/2,-Wd/2,L,Wd,s*0.06);ctx.fill();
-  ctx.fillStyle='#1a2a44';rr(ctx,-L*0.22,-Wd*0.38,L*0.5,Wd*0.76,s*0.03);ctx.fill();
+  ctx.fillStyle='#c4ccd8';rr(ctx,-L/2,-Wd/2,L,Wd,Wd*0.45);ctx.fill();ctx.fillStyle='#3ad0ff';ctx.fillRect(-L*0.4,-Wd*0.5,L*0.8,Wd*0.08);ctx.fillRect(-L*0.4,Wd*0.42,L*0.8,Wd*0.08);
+  ctx.fillStyle='#14203a';rr(ctx,-L*0.22,-Wd*0.36,L*0.52,Wd*0.72,Wd*0.3);ctx.fill();
   ctx.fillStyle='#9a6a3c';ctx.beginPath();ctx.arc(L*0.08,Wd*0.12,Wd*0.18,0,7);ctx.fill();
-  ctx.fillStyle='#fff6c0';ctx.fillRect(L*0.42,-Wd*0.42,L*0.08,Wd*0.2);ctx.fillRect(L*0.42,Wd*0.22,L*0.08,Wd*0.2);
+  ctx.fillStyle='#bff2ff';ctx.fillRect(L*0.44,-Wd*0.34,L*0.05,Wd*0.2);ctx.fillRect(L*0.44,Wd*0.14,L*0.05,Wd*0.2);
   ctx.fillStyle='#ff3030';ctx.fillRect(-L*0.5,-Wd*0.42,L*0.05,Wd*0.2);ctx.fillRect(-L*0.5,Wd*0.22,L*0.05,Wd*0.2);
   ctx.restore();
 }
 
 /* ================= 시우 산타: 카피바라 마을 (안 움직이는 배경은 한 번만 그려 저장 → 가볍게) ================= */
-const SANTA_FRIENDS=[{name:'토토',outfit:'beanie'},{name:'모모',outfit:'earmuff'},{name:'보보',outfit:'bobble'}];
+const SANTA_FRIENDS=[{name:'라온',outfit:'beanie'},{name:'채아',outfit:'earmuff'},{name:'지유',outfit:'bobble'}];
 const SANTA_GIFTS=[['🚂','기차'],['🧸','곰인형'],['🎨','크레파스'],['⚽','축구공'],['🦖','공룡 인형'],['🚀','로켓 장난감'],['🎹','장난감 피아노'],['🧩','퍼즐']];
 function santaItems(n){const g=SANTA_GIFTS.slice().sort(()=>Math.random()-0.5),out=[];for(let i=0;i<n;i++)out.push({icon:g[i][0],name:g[i][1],kind:'gift',friend:i%SANTA_FRIENDS.length});return out;}
 function drawSnowman(c,s){
