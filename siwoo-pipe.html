@@ -37,6 +37,19 @@ function txt(s,x,y,size,color,opt={}){
   if(opt.glow){ctx.shadowColor=opt.glow;ctx.shadowBlur=opt.blur||12;}
   ctx.fillStyle=color;ctx.fillText(s,x,y);ctx.restore();
 }
+// 큰 글자는 한 번 그려 이미지로 저장해 두고 재사용 (매 프레임 큰 글자+테두리를 새로 그리면 저사양에서 느려짐)
+const TXC=new Map();
+function txtC(str,x,y,size,color,opt={},scale=1){
+  size=Math.max(6,Math.round(size));const key=[str,size,color,opt.stroke||'',Math.round(opt.sw||0),opt.glow||'',DPR,opt.font||FB].join('|');let e=TXC.get(key);
+  if(!e){const font=`${size}px ${opt.font||FB}`;ctx.save();ctx.font=font;const w=Math.ceil(ctx.measureText(str).width);ctx.restore();
+    const pad=Math.ceil((opt.sw||0)+(opt.glow?(opt.blur||12):0)+size*0.15),cw=w+pad*2,ch=Math.ceil(size*1.4)+pad*2;
+    const cv=document.createElement('canvas');cv.width=Math.ceil(cw*DPR);cv.height=Math.ceil(ch*DPR);const c=cv.getContext('2d');c.scale(DPR,DPR);
+    c.font=font;c.textAlign='center';c.textBaseline='middle';
+    if(opt.stroke){c.lineJoin='round';c.lineWidth=opt.sw||size*0.18;c.strokeStyle=opt.stroke;c.strokeText(str,cw/2,ch/2);}
+    if(opt.glow){c.shadowColor=opt.glow;c.shadowBlur=opt.blur||12;}c.fillStyle=color;c.fillText(str,cw/2,ch/2);
+    e={cv,cw,ch};if(TXC.size>90)TXC.delete(TXC.keys().next().value);TXC.set(key,e);}
+  ctx.save();if(opt.alpha!=null)ctx.globalAlpha*=opt.alpha;ctx.drawImage(e.cv,x-e.cw*scale/2,y-e.ch*scale/2,e.cw*scale,e.ch*scale);ctx.restore();
+}
 function wrap(text,maxW,size,font){
   ctx.font=`${size}px ${font||FB}`;const out=[];
   for(const para of text.split('\n')){
@@ -48,6 +61,7 @@ function wrap(text,maxW,size,font){
 }
 
 /* ================= 저장 ================= */
+const APP_VER='v1.49 · 2026.11.25'; // 배포할 때마다 올림
 const STORE_KEY='siwoo-pipe-v1';
 function loadSave(){try{return JSON.parse(localStorage.getItem(STORE_KEY))||{};}catch(e){return {};}}
 function saveSave(){try{localStorage.setItem(STORE_KEY,JSON.stringify(SAVE));}catch(e){}}
@@ -619,9 +633,9 @@ const AU={c:null,mode:'title',step:0,next:0,T:0.3,tr:0,loops:0,
   carolStep(i,t,pat,st,T){
     const s=i%16,bar=i>>4,ch=pat.chords[bar%pat.chords.length],nch=pat.chords[(bar+1)%pat.chords.length],sec=pat.shout?1:Math.floor(bar/16);
     if(i===0){if(this.jStarted)this.jloop++;this.jStarted=true;}
-    const flow=!pat.shout&&G.screen==='play'&&G.phase==='flow',hz=pat.shout?3:flow?1+Math.min(3,G.hurry||0):(T>0.75?1:0),lp=pat.shout?0:this.jloop%2;
+    const flow=!pat.shout&&G.screen==='play'&&G.phase==='flow',hz=Math.min(liteMode()?2:9,pat.shout?3:flow?1+Math.min(3,G.hurry||0):(T>0.75?1:0)),lp=pat.shout?0:this.jloop%2;
     // 썰매 방울: 8분음표 "찰랑", 박에 강세 (물 흐르면 16분)
-    if(s%2===0||hz>=2)this.sleighBell(t,(s%4===0?0.045:0.028)*(hz>=2&&s%2?0.7:1),ch);
+    if(s%2===0||(hz>=2&&!liteMode()))this.sleighBell(t,(s%4===0?0.045:0.028)*(hz>=2&&s%2?0.7:1),ch);
     // 북: 1·3박 킥, 2·4박 스네어, 구간 끝 팀파니
     if(s===0||s===8)this.kick(t,0.32+0.05*hz);
     if(s===4||s===12)this.snare(t,0.16+0.04*hz);
@@ -634,7 +648,7 @@ const AU={c:null,mode:'title',step:0,next:0,T:0.3,tr:0,loops:0,
     if(s%8===4)for(const n of ch)this.jpiano(mf(n),t,0.035,st*2);
     if(s===0)for(const n of ch)this.pad(mf(n),st*16,t,0.5+0.4*T);
     // 첼레스타 아르페지오 (8분 → 고조되면 16분)
-    if(T>=0.5&&(s%2===0||hz>=2)){const ar=[0,1,2,1][(s>>1)%4];this.glock(mf(ch[ar]+24),st*1.2,t,0.03+0.01*hz);}
+    if(T>=0.5&&(s%2===0||(hz>=2&&!liteMode()))){const ar=[0,1,2,1][(s>>1)%4];this.glock(mf(ch[ar]+24),st*1.2,t,0.03+0.01*hz);}
     // 금관: 물 흐르면 마디 첫 박 "빠밤!"
     if(hz>=2&&(s===0||(hz>=3&&s===10)))for(const n of ch)this.brass(mf(n),st*(s===0?3:1.5),t,0.02+0.006*hz);
     if(hz>=2&&i%128===112)this.riser(st*16,t,0.05+0.015*hz);
@@ -666,7 +680,7 @@ const AU={c:null,mode:'title',step:0,next:0,T:0.3,tr:0,loops:0,
     const form=pat.shout?JZ_SHOUT:JZ_FORM,s=i%16,bar=i>>4,hb=i>>3,ch=JC[form[hb%form.length]],nch=JC[form[(hb+1)%form.length]];
     if(i===0){if(this.jStarted)this.jloop++;this.jStarted=true;}
     const sw=s%4===2?st*0.66:0,tt=t+sw;
-    const flow=!pat.shout&&G.screen==='play'&&G.phase==='flow',hz=pat.shout?3:flow?1+Math.min(3,G.hurry||0):(T>0.75?1:0);
+    const flow=!pat.shout&&G.screen==='play'&&G.phase==='flow',hz=Math.min(liteMode()?2:9,pat.shout?3:flow?1+Math.min(3,G.hurry||0):(T>0.75?1:0));
     const lp=pat.shout?0:this.jloop%3;
     // ── 드럼: 라이드 "칭— 칭기 칭— 칭기" + 2·4박 하이햇 "칙" + 스네어 고스트, 킥은 가끔만 "쿵"
     if(s%4===0)this.ride(t,(s===4||s===12)?0.05:0.04);
@@ -2933,21 +2947,22 @@ function drawTally(){
   const jy=G.capyJump>0?-Math.sin(G.capyJump/0.5*Math.PI)*size*0.9:(e>=1?-Math.abs(Math.sin(G.time*4))*size*0.12:0);
   ctx.save();ctx.beginPath();ctx.rect(s.x,s.y,s.w,s.h);ctx.clip();
   if(e>0){ctx.fillStyle=`rgba(0,0,0,${0.35*e})`;ctx.fillRect(s.x,s.y,s.w,s.h);
-    ctx.save();ctx.translate(cx,cy);ctx.rotate(G.time*0.4);ctx.globalAlpha=0.35*e;ctx.fillStyle='#ffe58a';
-    for(let i=0;i<12;i++){ctx.rotate(Math.PI/6);ctx.beginPath();ctx.moveTo(0,0);ctx.lineTo(-size*0.5,-s.w);ctx.lineTo(size*0.5,-s.w);ctx.closePath();ctx.fill();}ctx.restore();}
+    if(!G.raySp){const R=256,cv=document.createElement('canvas');cv.width=cv.height=R*2;const c=cv.getContext('2d');c.translate(R,R);c.fillStyle='#ffe58a';
+      for(let i=0;i<12;i++){c.rotate(Math.PI/6);c.beginPath();c.moveTo(0,0);c.lineTo(-R*0.09,-R);c.lineTo(R*0.09,-R);c.closePath();c.fill();}G.raySp=cv;}
+    ctx.save();ctx.translate(cx,cy);ctx.rotate(G.time*0.4);ctx.globalAlpha=0.35*e;const RR=s.w;ctx.drawImage(G.raySp,-RR,-RR,RR*2,RR*2);ctx.restore();}
   drawBigCapy(cx,cy+jy,size,G.concept.capyOutfit,G.time,G.ttabongT>=0,G.capyJump>0);
   ctx.restore();
   const tx=s.x+s.w/2,fs=Math.max(16,s.h*0.11);
   if(G.ttabongT>=0){
     const p=Math.min(1,G.ttabongT/0.25),pop=p<1?0.5+0.7*p:1+0.05*Math.sin(G.time*8);
-    txt('👍 따봉!',tx,s.y+s.h*0.13,fs*1.25*pop,'#ffe14d',{font:FT,stroke:'#5a2a00',sw:fs*0.18,glow:'#ffb000',blur:20});
-    txt(`크로스 ${n}개, 최고예요!`,tx,s.y+s.h*0.13+fs*1.0,Math.max(13,fs*0.42),'#ffffff',{font:FT,stroke:'#000',sw:4});
+    txtC('👍 따봉!',tx,s.y+s.h*0.13,fs*1.25,'#ffe14d',{font:FT,stroke:'#5a2a00',sw:fs*0.18,glow:'#ffb000',blur:20},pop);
+    txtC(`크로스 ${n}개, 최고예요!`,tx,s.y+s.h*0.13+fs*1.0,Math.max(13,fs*0.42),'#ffffff',{font:FT,stroke:'#000',sw:4});
   }else if(G.phase==='tally'){
-    if(T<0.7)txt(n?'✚ 크로스 세어 볼까요?':'✚ 크로스는…',tx,s.y+s.h*0.2,Math.max(15,fs*0.55),'#ffffff',{font:FT,stroke:'#000',sw:5});
-    else if(n===0)txt('다음엔 크로스도 써 봐요!',tx,s.y+s.h*0.2,Math.max(15,fs*0.55),'#ffffff',{font:FT,stroke:'#000',sw:5});
+    if(T<0.7)txtC(n?'✚ 크로스 세어 볼까요?':'✚ 크로스는…',tx,s.y+s.h*0.2,Math.max(15,fs*0.55),'#ffffff',{font:FT,stroke:'#000',sw:5});
+    else if(n===0)txtC('다음엔 크로스도 써 봐요!',tx,s.y+s.h*0.2,Math.max(15,fs*0.55),'#ffffff',{font:FT,stroke:'#000',sw:5});
     else{const since=(T-0.7)-(G.tallyIdx-1)*0.8,pop=since<0.2?0.6+2*since:1;
-      txt(`✚ ${G.tallyIdx}개`,tx,s.y+s.h*0.17,fs*pop,'#ffe14d',{font:FT,stroke:'#5a2a00',sw:fs*0.16,glow:'#ffb000',blur:16});
-      txt(PRAISE[(G.tallyIdx-1)%PRAISE.length],tx,s.y+s.h*0.17+fs*0.85,Math.max(14,fs*0.45),'#ffffff',{font:FT,stroke:'#000',sw:4});}
+      txtC(`✚ ${G.tallyIdx}개`,tx,s.y+s.h*0.17,fs,'#ffe14d',{font:FT,stroke:'#5a2a00',sw:fs*0.16,glow:'#ffb000',blur:16},pop);
+      txtC(PRAISE[(G.tallyIdx-1)%PRAISE.length],tx,s.y+s.h*0.17+fs*0.85,Math.max(14,fs*0.45),'#ffffff',{font:FT,stroke:'#000',sw:4});}
   }
 }
 function drawTallyGrid(){
@@ -2958,8 +2973,8 @@ function drawTallyGrid(){
     ctx.save();ctx.translate(x+s/2,y+s/2);ctx.scale(sc,sc);ctx.translate(-s/2,-s/2);
     ctx.drawImage(pieceSprite(cell.t,s,cell.dir,cell.item&&cell.item.icon),0,0,s,s);ctx.restore();
     for(const seg of cell.fills)drawWater(seg,cell);
-    ctx.save();ctx.lineWidth=3;ctx.strokeStyle='#ffd23a';ctx.shadowColor='#ffb000';ctx.shadowBlur=14;rr(ctx,x+2,y+2,s-4,s-4,8);ctx.stroke();ctx.restore();
-    txt(String(i+1),x+s*0.82,y+s*0.18,Math.max(11,s*0.3),'#ffe14d',{font:FT,stroke:'#000',sw:4});
+    ctx.save();rr(ctx,x+2,y+2,s-4,s-4,8);ctx.lineWidth=8;ctx.strokeStyle='rgba(255,176,0,0.35)';ctx.stroke();ctx.lineWidth=3;ctx.strokeStyle='#ffd23a';ctx.stroke();ctx.restore();
+    txtC(String(i+1),x+s*0.82,y+s*0.18,Math.max(11,s*0.3),'#ffe14d',{font:FT,stroke:'#000',sw:4});
   }
 }
 
@@ -3092,7 +3107,7 @@ function layout(){
   spriteCache={};
 }
 function viewSize(){const vv=window.visualViewport;return [Math.round(vv?vv.width:window.innerWidth),Math.round(vv?vv.height:window.innerHeight)];}
-function resize(){[W,H]=viewSize();DPR=liteMode()?1:Math.min(2,window.devicePixelRatio||1);while(!liteMode()&&DPR>1&&W*H*DPR*DPR>3.2e6)DPR=Math.max(1,DPR-0.25);SC.cv=null;
+function resize(){TXC.clear();[W,H]=viewSize();DPR=liteMode()?1:Math.min(2,window.devicePixelRatio||1);while(!liteMode()&&DPR>1&&W*H*DPR*DPR>3.2e6)DPR=Math.max(1,DPR-0.25);SC.cv=null;
   cv.style.width=W+'px';cv.style.height=H+'px';cv.width=Math.round(W*DPR);cv.height=Math.round(H*DPR);layout();}
 
 /* ================= 파이프 그리기 ================= */
@@ -3184,11 +3199,15 @@ function button(x,y,w,h,label,col,fn,opt={}){
   txt(label,x+w/2,y+dy+(h-4)/2+1,opt.size||h*0.4,opt.tc||'#fff',{font:FT,stroke:'rgba(0,0,0,0.35)',sw:3});
   G.btns.push({x,y,w,h,fn});
 }
-function pill(x,y,label,fs,col,align){
-  ctx.font=`${fs}px ${FT}`;const tw=ctx.measureText(label).width,w=tw+fs*1.2,h=fs*1.7;
-  const px=align==='right'?x-w:align==='center'?x-w/2:x;
-  rr(ctx,px,y,w,h,h/2);ctx.fillStyle='rgba(0,0,0,0.55)';ctx.fill();ctx.lineWidth=2;ctx.strokeStyle=col;ctx.stroke();
-  txt(label,px+w/2,y+h/2+1,fs,col,{font:FT});return h;
+function pill(x,y,label,fs,col,align){ // 알약 모양 안내판: 한 번 그려 이미지로 재사용
+  const key='P|'+label+'|'+fs+'|'+col+'|'+DPR;let e=TXC.get(key);
+  if(!e){ctx.save();ctx.font=`${fs}px ${FT}`;const tw=ctx.measureText(label).width;ctx.restore();const w=tw+fs*1.2,h=fs*1.7,cv=document.createElement('canvas');
+    cv.width=Math.ceil((w+4)*DPR);cv.height=Math.ceil((h+4)*DPR);const c=cv.getContext('2d');c.scale(DPR,DPR);
+    rr(c,2,2,w,h,h/2);c.fillStyle='rgba(0,0,0,0.55)';c.fill();c.lineWidth=2;c.strokeStyle=col;c.stroke();
+    c.font=`${fs}px ${FT}`;c.textAlign='center';c.textBaseline='middle';c.fillStyle=col;c.fillText(label,2+w/2,2+h/2+1);
+    e={cv,w,h};if(TXC.size>90)TXC.delete(TXC.keys().next().value);TXC.set(key,e);}
+  const px=align==='right'?x-e.w:align==='center'?x-e.w/2:x;
+  ctx.drawImage(e.cv,px-2,y-2,e.w+4,e.h+4);return e.h;
 }
 function drawHUD(){
   const s=LAY.scene,fs=clamp(s.h*0.06,13,21);
@@ -3199,14 +3218,14 @@ function drawHUD(){
   let y3=y2;
   if(G.phase==='countdown'&&!isFinite(G.countdown)){
     const cx=s.x+s.w/2,cy=s.y+s.h*0.5,b2=Math.min(s.h*0.16,s.w*0.1)*(1+0.05*Math.sin(G.time*5));
-    txt('준비되면 아래 버튼!',cx,cy-b2*0.9,Math.max(13,s.h*0.07),'#bfefff',{font:FT,stroke:'rgba(0,0,0,0.75)',sw:5});
-    txt(G.concept.sendLabel||'💧 물 보내기',cx,cy+b2*0.4,b2,'#ffffff',{font:FT,stroke:'rgba(0,0,0,0.8)',sw:b2*0.12,glow:'#5cc8ff',blur:20});
+    txtC('준비되면 아래 버튼!',cx,cy-b2*0.9,Math.max(13,s.h*0.07),'#bfefff',{font:FT,stroke:'rgba(0,0,0,0.75)',sw:5});
+    const b0=Math.min(s.h*0.16,s.w*0.1);txtC(G.concept.sendLabel||'💧 물 보내기',cx,cy+b2*0.4,b0,'#ffffff',{font:FT,stroke:'rgba(0,0,0,0.8)',sw:b0*0.12,glow:'#5cc8ff',blur:20},b2/b0);
   }else if(G.phase==='countdown'){
     const sec=Math.max(1,Math.ceil(G.countdown)),urgent=sec<=5,f=sec-G.countdown;
-    const pop=1+0.35*Math.max(0,1-f*5),big=Math.min(s.h*0.42,s.w*0.3)*pop;
+    const pop=1+0.35*Math.max(0,1-f*5),big0=Math.min(s.h*0.42,s.w*0.3);
     const cx=s.x+s.w/2,cy=s.y+s.h*0.5,col=urgent?'#ff4a3a':'#ffffff';
-    txt(G.concept.countLabel||'물 나오기까지',cx,cy-Math.min(s.h*0.42,s.w*0.3)*0.62,Math.max(13,s.h*0.07),'#bfefff',{font:FT,stroke:'rgba(0,0,0,0.75)',sw:5});
-    txt(String(sec),cx,cy+Math.min(s.h*0.42,s.w*0.3)*0.08,big,col,{font:FT,stroke:'rgba(0,0,0,0.8)',sw:big*0.1,glow:urgent?'#ff2a00':'#5cc8ff',blur:24});
+    txtC(G.concept.countLabel||'물 나오기까지',cx,cy-big0*0.62,Math.max(13,s.h*0.07),'#bfefff',{font:FT,stroke:'rgba(0,0,0,0.75)',sw:5});
+    txtC(String(sec),cx,cy+big0*0.08,big0,col,{font:FT,stroke:'rgba(0,0,0,0.8)',sw:big0*0.1,glow:urgent?'#ff2a00':'#5cc8ff',blur:24},pop);
   }else if(G.phase==='flow'){pill(s.x+10,y2,G.concept.flowMsg+(G.hurry?' '+'⚡'.repeat(Math.min(G.hurry,3)):''),fs,G.hurry?'#ffd23a':'#7fd8ff');y3=y2+ph+8;}
   else if(G.phase==='saving'){pill(s.x+10,y2,G.concept.saveMsg,fs*1.1,'#ffe14d');y3=y2+ph+8;}
   drawConnGauge(s);
@@ -3353,7 +3372,7 @@ function drawBar(){
   },{size:Math.min(h*0.36,20),glow:active&&!G.fast});
 }
 function drawFx(){for(const p of G.fx){ctx.globalAlpha=Math.max(0,1-p.life/p.max);ctx.fillStyle=p.col;ctx.beginPath();ctx.arc(p.x,p.y,p.s,0,7);ctx.fill();}ctx.globalAlpha=1;}
-function drawFloats(){for(const f of G.floats){const a=1-Math.max(0,(f.t-0.6)/0.5);txt(f.text,f.x,f.y-f.t*40,f.size,f.col,{font:FT,stroke:'#000',sw:4,alpha:Math.max(0,a)});}}
+function drawFloats(){for(const f of G.floats){const a=1-Math.max(0,(f.t-0.6)/0.5);txtC(f.text,f.x,f.y-f.t*40,f.size,f.col,{font:FT,stroke:'#000',sw:4,alpha:Math.max(0,a)});}}
 function panelBox(lines,title,fs){
   const g=LAY.grid,gw=g.cell*COLS;const pw=Math.min(W-24,400);
   const wrapped=[];for(const l of lines)wrapped.push(...(l===''?['']:wrap(l,pw-36,fs)));
@@ -3405,11 +3424,11 @@ function drawPlay(){
   drawBar();drawOverlay();
   if(G.hurryShow>0&&G.phase==='flow'){
     const s=LAY.scene,a=Math.min(1,G.hurryShow/0.4),age=2.4-G.hurryShow,pop=age<0.25?0.6+1.6*age:1+0.06*Math.sin(G.time*14);
-    ctx.font=`100px ${FT}`;const fit=s.w*0.9/ctx.measureText('⚡ HURRY UP! ⚡').width*100;
-    const big=Math.min(s.h*0.24,fit)*pop,cx=s.x+s.w/2,cy=s.y+s.h*0.42,flash=Math.sin(G.time*20)>0;
+    if(G.hurryFitW!==s.w){ctx.save();ctx.font=`100px ${FT}`;G.hurryFit=s.w*0.9/ctx.measureText('⚡ HURRY UP! ⚡').width*100;ctx.restore();G.hurryFitW=s.w;}
+    const big0=Math.min(s.h*0.24,G.hurryFit),big=big0*pop,cx=s.x+s.w/2,cy=s.y+s.h*0.42,flash=Math.sin(G.time*20)>0;
     ctx.save();ctx.globalAlpha=a*0.35;ctx.fillStyle='#000';ctx.fillRect(s.x,cy-big*0.95,s.w,big*1.9);ctx.restore();
-    txt('⚡ HURRY UP! ⚡',cx,cy,big,flash?'#ffe14d':'#ff5a3a',{font:FT,stroke:'#000',sw:big*0.14,glow:'#ff3000',blur:22,alpha:a});
-    txt(`${G.concept.fluidSubj||'물이'} 빨라져요!`,cx,cy+big*0.75,Math.max(14,big*0.38),'#ffffff',{font:FT,stroke:'#000',sw:5,alpha:a});
+    txtC('⚡ HURRY UP! ⚡',cx,cy,big0,flash?'#ffe14d':'#ff5a3a',{font:FT,stroke:'#000',sw:big0*0.14,glow:'#ff3000',blur:22,alpha:a},pop);
+    txtC(`${G.concept.fluidSubj||'물이'} 빨라져요!`,cx,cy+big*0.75,Math.max(14,big0*0.38),'#ffffff',{font:FT,stroke:'#000',sw:5,alpha:a});
   }
 }
 function drawCard(cp,x,y,w,h,row){
@@ -3458,7 +3477,8 @@ function drawTitle(){
   else{const cols=3,rows=Math.ceil(NC/cols),cw=Math.min((W-64)/cols,300),ch=clamp((H-y0-16)/rows-12,80,180);CONCEPTS.forEach((cp,i)=>drawCard(cp,(W-(cw*cols+16*(cols-1)))/2+(i%cols)*(cw+16),y0+Math.floor(i/cols)*(ch+12),cw,ch,false));y0+=rows*(ch+12);}
   button(W-58,10,48,48,SAVE.muted?'🔇':'🔊','#3a3f5a',toggleMute,{size:20});
   {const lab=SAVE.lite==='on'?'🐢 가볍게':SAVE.lite==='off'?'✨ 고화질':(liteMode()?'🐢 자동(가볍게)':'⚙ 자동');
-   button(10,10,Math.min(150,W*0.36),48,lab,SAVE.lite==='on'||liteMode()?'#2a7a8a':'#3a3f5a',()=>{SAVE.lite=SAVE.lite==='auto'?'on':SAVE.lite==='on'?'off':'auto';if(SAVE.lite==='off')SAVE.autoLite=false;saveSave();setLite(!!SAVE.autoLite);},{size:15});}
+   button(10,14,Math.min(130,W*0.3),44,lab,SAVE.lite==='on'||liteMode()?'#2a7a8a':'#3a3f5a',()=>{SAVE.lite=SAVE.lite==='auto'?'on':SAVE.lite==='on'?'off':'auto';if(SAVE.lite==='off')SAVE.autoLite=false;saveSave();setLite(!!SAVE.autoLite);},{size:15});}
+  txt(APP_VER,W/2,9,11,'#7a7aa0',{font:FB});
   if(G.confirm)drawConfirm();
 }
 /* ===== 스테이지 시작 확인창 ===== */
