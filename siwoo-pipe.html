@@ -61,7 +61,7 @@ function wrap(text,maxW,size,font){
 }
 
 /* ================= 저장 ================= */
-const APP_VER='v1.51 · 2026.11.25'; // 배포할 때마다 올림
+const APP_VER='v1.53 · 2026.11.26'; // 배포할 때마다 올림
 const STORE_KEY='siwoo-pipe-v1';
 function loadSave(){try{return JSON.parse(localStorage.getItem(STORE_KEY))||{};}catch(e){return {};}}
 function saveSave(){try{localStorage.setItem(STORE_KEY,JSON.stringify(SAVE));}catch(e){}}
@@ -182,7 +182,7 @@ const MUS={
           [32,77,2],[34,81,2],[36,86,4],[40,84,2],[42,81,2],[44,77,4],
           [48,79,6],[54,77,2],[56,74,4],[60,77,4]]
   },
-  triumph:{bpm:126,T:0.62,gain:1.6, // D장조 승리 (D-G-A-D)
+  triumph:{bpm:132,T:0.85,gain:1.8,horns:true,timpani:true,win:true, // D장조 승리 (D-G-A-D)
     chords:[[62,66,69],[67,71,74],[69,73,76],[62,66,69]],
     lead:[[0,74,4],[4,78,4],[8,81,8],[16,83,4],[20,81,4],[24,79,8],[32,81,4],[36,85,4],[40,88,8],[48,86,16]]
   }
@@ -298,19 +298,20 @@ const AU={c:null,mode:'title',step:0,next:0,T:0.3,tr:0,loops:0,
   heartbeat(on){
     const c=this.c,now=c.currentTime;
     if(on&&!this.hbOn){this.hbOn=true;this.hbNext=now+0.6;this.hbN=0;this.startDrone();}
-    if(!on&&this.hbOn){this.hbOn=false;this.stopDrone();}
-    if(!this.hbOn)return;
+    if(!on&&this.hbOn){this.hbOn=false;const f=G.fast?1.6:0.6;this.stopDrone(f);this.hbFade=G.fast?now+f:0;}
+    if(!this.hbOn&&!(this.hbFade>now))return;
+    const fk=this.hbOn?1:(this.hbFade-now)/1.6;
     const h=Math.min(G.hurry||0,3),iv=60/[66,86,108,132][h],v=0.34+0.08*h;
     if(this.hbDrone)this.hbDrone.f.frequency.setTargetAtTime(380+160*h,now,0.8);
     if(this.hbTrem)this.hbTrem.g.gain.setTargetAtTime(h>=1?0.018+0.008*h:0,now,0.6);
     while(this.hbNext<now+0.15){const t=this.hbNext,n=this.hbN++;
       // 심장 "쿵-쿵": 순수한 저음 사인파 (잡음 없음)
-      this.thump(t,v);this.thump(t+Math.min(0.22,iv*0.3),v*0.62);
+      this.thump(t,v*fk);this.thump(t+Math.min(0.22,iv*0.3),v*0.62*fk);
       // 박동에 맞춰 저음이 숨 쉬듯 커졌다 작아짐
       if(this.hbDrone){const g=this.hbDrone.g.gain,base=0.05+0.02*h;g.setValueAtTime(base,t);g.linearRampToValueAtTime(base*1.9,t+0.06);g.linearRampToValueAtTime(base,t+Math.min(0.5,iv*0.8));}
       // HURRY UP부터: 피치카토로 맥박 리듬 (근음·5도)
-      if(h>=1){const root=[45,45,46,47][h],notes=[root,root+7,root+12,root+7];this.pizz(mf(notes[n%4]+12),t,0.09+0.02*h);
-        if(h>=2)this.pizz(mf(notes[(n+2)%4]+12),t+iv/2,0.06+0.02*h);}
+      if(h>=1){const root=[45,45,46,47][h],notes=[root,root+7,root+12,root+7];this.pizz(mf(notes[n%4]+12),t,(0.09+0.02*h)*fk);
+        if(h>=2)this.pizz(mf(notes[(n+2)%4]+12),t+iv/2,(0.06+0.02*h)*fk);}
       this.hbNext+=iv;}
   },
   thump(t,v){
@@ -339,9 +340,9 @@ const AU={c:null,mode:'title',step:0,next:0,T:0.3,tr:0,loops:0,
     const tos=[mf(69),mf(72),mf(76)].map(fr=>{const o=c.createOscillator();o.type='triangle';o.frequency.value=fr;o.connect(tf);o.start(now);return o;});
     tf.connect(am);am.connect(tg);tg.connect(this.sfx);tg.connect(this.rev);lfo.start(now);this.hbTrem={os:[...tos,lfo],g:tg};
   },
-  stopDrone(){
-    const now=this.c.currentTime;
-    for(const d of [this.hbDrone,this.hbTrem]){if(!d)continue;d.g.gain.cancelScheduledValues(now);d.g.gain.setValueAtTime(d.g.gain.value,now);d.g.gain.linearRampToValueAtTime(0,now+0.6);for(const o of d.os)o.stop(now+0.7);}
+  stopDrone(f){
+    const now=this.c.currentTime;f=f||0.6;
+    for(const d of [this.hbDrone,this.hbTrem]){if(!d)continue;d.g.gain.cancelScheduledValues(now);d.g.gain.setValueAtTime(d.g.gain.value,now);d.g.gain.linearRampToValueAtTime(0,now+f);for(const o of d.os)o.stop(now+f+0.1);}
     this.hbDrone=null;this.hbTrem=null;
   },
   faucet(){if(!this.c)return;const t=this.c.currentTime;this.tone(700,0.28,'sine',0.1,1300,t);const ns=this.tonesAt(67);for(let k=0;k<7;k++){const f=mf(ns[ri(4)]);this.tone(f,0.09,'sine',0.08,f*1.5,t+0.25+k*0.09);}this.tone(260,0.35,'sine',0.12,150,t+0.25);},
@@ -541,9 +542,27 @@ const AU={c:null,mode:'title',step:0,next:0,T:0.3,tr:0,loops:0,
     if(ph==='flow'){let x=0.62+0.38*clamp(G.elapsed/G.dangerT,0,1)+(G.fast?0.15:0);return Math.min(1,x);}
     return 0.3;
   },
-  setMusic(m){this.mode=m;this.step=0;this.curStep=null;this.jloop=0;this.jStarted=false;this.lastBass=0;this.solo=0;this.comp=null;if(m&&MUS[m].build){this.tr=0;this.loops=0;this.T=0.05;}if(this.c)this.next=this.c.currentTime+0.08;},
+  setMusic(m){
+    const c=this.c,old=this.mode;
+    if(c&&old&&m&&m!==old&&MUS[old]&&MUS[m]&&MUS[m].win&&!MUS[old].win&&this.mus.gain.value>0.05){
+      this.endPrev();const now=c.currentTime,bus=c.createGain(),rs=c.createGain(),FADE=2.5;
+      bus.gain.setValueAtTime(this.mus.gain.value,now);bus.gain.linearRampToValueAtTime(0.0001,now+FADE);bus.connect(this.comp);rs.gain.value=0.2;bus.connect(rs);rs.connect(this.rev);
+      this.prev={mode:old,step:this.step,next:Math.max(this.next,now+0.02),T:this.T,tr:this.tr,until:now+FADE,bus,rs,jloop:this.jloop,jStarted:this.jStarted,jcomp:this.jcomp,lastBass:this.lastBass};
+      this.mus.gain.cancelScheduledValues(now);this.mus.gain.setValueAtTime(0.0001,now); // 새 승리 음악은 0에서 빠르게 올라옴
+    }
+    this.mode=m;this.step=0;this.curStep=null;this.jloop=0;this.jStarted=false;this.lastBass=0;this.solo=0;this.jcomp=null;if(m&&MUS[m].build){this.tr=0;this.loops=0;this.T=0.05;}if(this.c)this.next=this.c.currentTime+0.08;},
+  endPrev(){const P=this.prev;if(!P)return;this.prev=null;setTimeout(()=>{try{P.bus.disconnect();P.rs.disconnect();}catch(e){}},1500);},
+  playPrev(){ // 사라져 가는 이전 배경음악 예약
+    const P=this.prev;if(!P)return;const now=this.c.currentTime;if(now>P.until){this.endPrev();return;}
+    const pp=MUS[P.mode],keys=['mus','mode','T','tr','curStep','jloop','jStarted','jcomp','lastBass'],sv={};for(const k of keys)sv[k]=this[k];
+    Object.assign(this,{mus:P.bus,mode:P.mode,T:P.T,tr:P.tr,jloop:P.jloop,jStarted:P.jStarted,jcomp:P.jcomp,lastBass:P.lastBass});
+    try{const Tu=Math.max(P.T,pp.Tmin||0),bpm=pp.bpmFn?pp.bpmFn(Tu):pp.build?pp.bpm0+pp.bpmR*Tu:pp.bpm,st=60/bpm/4;
+      while(P.next<Math.min(P.until,now+0.2)){this.playStep(P.step,P.next,pp,st);P.next+=st;P.step=(P.step+1)%(pp.len||64);}}
+    finally{Object.assign(P,{jloop:this.jloop,jStarted:this.jStarted,jcomp:this.jcomp,lastBass:this.lastBass});for(const k of keys)this[k]=sv[k];}
+  },
   update(){
     if(!this.c)return;
+    this.playPrev();
     // 물이 흐르는 동안(빨리빨리 전): 배경음악 페이드아웃 + 심장 박동 긴장 사운드
     const hb=G.screen==='play'&&G.phase==='flow'&&!G.fast&&!(MUS[this.mode]&&MUS[this.mode].keepFlow),quiet=hb||(G.screen==='play'&&G.phase==='leak');
     this.heartbeat(hb);
@@ -554,7 +573,7 @@ const AU={c:null,mode:'title',step:0,next:0,T:0.3,tr:0,loops:0,
     if(!this.mode)return;const pat=MUS[this.mode];
     if(pat.build&&G.screen==='play')this.T+=(this.tension()-this.T)*0.03;else this.T=pat.T;
     const Tu=Math.max(this.T,pat.Tmin||0);
-    this.mus.gain.setTargetAtTime((0.34+0.26*Tu)*(pat.gain||1),this.c.currentTime,0.4);
+    this.mus.gain.setTargetAtTime((0.34+0.26*Tu)*(pat.gain||1),this.c.currentTime,pat.win?0.12:0.4);
     const bpm=pat.bpmFn?pat.bpmFn(Tu):pat.build?pat.bpm0+pat.bpmR*Tu:pat.bpm,st=60/bpm/4;
     if(this.next<this.c.currentTime-0.3)this.next=this.c.currentTime+0.05;
     while(this.next<this.c.currentTime+(liteMode()?0.35:0.2)){this.playStep(this.step,this.next,pat,st);this.next+=st;this.step=(this.step+1)%(pat.len||64);}
@@ -695,8 +714,8 @@ const AU={c:null,mode:'title',step:0,next:0,T:0.3,tr:0,loops:0,
     if(s%4===0)this.ubass(mf(this.walk(form,i>>2)),st*3.4,t,0.3);
     if(hz>=3&&s===14)this.ubass(mf(this.lastBass||ch.r),st*1.2,tt,0.14);
     // ── 재즈 피아노 컴핑 (찰스턴·엇박 리듬을 마디마다 바꿈, 짧게 끊어 침)
-    if(s===0)this.comp=JCOMP[ri(JCOMP.length)].concat(hz>=2?[14]:[]);
-    if(this.comp&&this.comp.includes(s)){const cc=s>=14?nch:ch,ln=s%8===0?st*2.6:st*1.3;cc.v.forEach((n,k)=>this.jpiano(mf(n),tt+k*0.006,0.05,ln));}
+    if(s===0)this.jcomp=JCOMP[ri(JCOMP.length)].concat(hz>=2?[14]:[]);
+    if(this.jcomp&&this.jcomp.includes(s)){const cc=s>=14?nch:ch,ln=s%8===0?st*2.6:st*1.3;cc.v.forEach((n,k)=>this.jpiano(mf(n),tt+k*0.006,0.05,ln));}
     // ── 물이 흐르면: 브라스 섹션이 "빠밤!" (HURRY UP마다 더 세게)
     if(hz>=2&&((s===0&&bar%2===0)||s===6||(hz>=3&&s===14)||(hz>=4&&s===10))){const cc=s>=14?nch:ch;for(const n of cc.v)this.brass(mf(n+12),st*(s===0?2.2:1.1),tt,0.02+0.006*hz);}
     if(hz>=3&&!pat.shout&&s===8&&bar%2===1){const top=ch.v[3]+12;[[0,top],[2,top+2],[4,top+3]].forEach(([d,n],k)=>this.brass(mf(n),st*(k===2?3:1.2),t+d*st+(d===2?st*0.66:0),0.06));}
