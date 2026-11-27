@@ -61,7 +61,7 @@ function wrap(text,maxW,size,font){
 }
 
 /* ================= 저장 ================= */
-const APP_VER='v1.53 · 2026.11.26'; // 배포할 때마다 올림
+const APP_VER='v1.54 · 2026.11.28'; // 배포할 때마다 올림
 const STORE_KEY='siwoo-pipe-v1';
 function loadSave(){try{return JSON.parse(localStorage.getItem(STORE_KEY))||{};}catch(e){return {};}}
 function saveSave(){try{localStorage.setItem(STORE_KEY,JSON.stringify(SAVE));}catch(e){}}
@@ -97,6 +97,8 @@ const JB=[[[0,71,4],[4,71,4],[8,71,8]],[[0,71,4],[4,71,4],[8,71,8]],[[0,71,4],[4
 const CAROL_C=[...JB,...JB.slice(0,6),[[0,74,4],[4,74,4],[8,72,4],[12,69,4]],[[0,67,16]]];
 const DECK=[[[0,74,6],[6,72,2],[8,71,4],[12,69,4]],[[0,67,4],[4,69,4],[8,71,4],[12,67,4]],[[0,69,2],[2,71,2],[4,72,2],[6,69,2],[8,71,6],[14,69,2]],[[0,67,4],[4,66,4],[8,67,8]]];
 const CAROL_D=[...DECK,...DECK,[[0,69,6],[6,71,2],[8,72,4],[12,69,4]],[[0,71,6],[6,72,2],[8,74,4],[12,69,4]],[[0,71,2],[2,73,2],[4,74,4],[8,76,2],[10,78,2],[12,79,4]],[[0,78,4],[4,76,4],[8,74,8]],...DECK];
+/* 산타 스테이지: 단계마다 다른 캐롤 (모두 저작권이 끝난 전통 캐롤 멜로디). 화음은 멜로디에 맞춰 자동으로 고른 것 */
+const SANTA_SONGS=['jingle','wish','deck','hark','king','silent'];
 const MUS={
   play:{build:true,siren:true,Tmin:0.55,gain:1.5,horns:true,timpani:true,bpm0:84,bpmR:80, // D단조 (Dm-Bb-C-A)
     chords:[[62,65,69],[58,62,65],[60,64,67],[57,61,64]],
@@ -174,6 +176,30 @@ const MUS={
   carol:{build:true,carol:true,keepFlow:true,len:768,Tmin:0.4,gain:2.0,chords:CAROL_CH.map(k=>CH[k]),
     bpmFn:T=>G.phase==='flow'?132+12*Math.min(3,G.hurry||0):112+12*T,
     lead:jzLead([...CAROL_V,...CAROL_C,...CAROL_D])},
+  carol_jingle:{build:true,carol:true,keepFlow:true,songName:"징글벨",sb:16,six8:false,len:512,Tmin:0.4,gain:2.0,
+    bpmFn:T=>G.phase==='flow'?132+12*Math.min(3,G.hurry||0):112+12*T,
+    chords:[[67, 71, 74], [67, 71, 74], [67, 71, 74], [60, 64, 67], [69, 72, 76], [62, 66, 69], [62, 66, 69, 72], [67, 71, 74], [67, 71, 74], [67, 71, 74], [67, 71, 74], [60, 64, 67], [69, 72, 76], [67, 71, 74], [69, 72, 76], [67, 71, 74], [67, 71, 74], [67, 71, 74], [67, 71, 74], [67, 71, 74], [60, 64, 67], [67, 71, 74], [67, 71, 74], [62, 66, 69], [67, 71, 74], [67, 71, 74], [67, 71, 74], [67, 71, 74], [60, 64, 67], [67, 71, 74], [62, 66, 69, 72], [67, 71, 74]],
+    lead:[[0, 62, 4], [4, 71, 4], [8, 69, 4], [12, 67, 4], [16, 62, 12], [28, 62, 2], [30, 62, 2], [32, 62, 4], [36, 71, 4], [40, 69, 4], [44, 67, 4], [48, 64, 16], [64, 64, 4], [68, 72, 4], [72, 71, 4], [76, 69, 4], [80, 66, 16], [96, 74, 4], [100, 74, 4], [104, 72, 4], [108, 69, 4], [112, 71, 16], [128, 62, 4], [132, 71, 4], [136, 69, 4], [140, 67, 4], [144, 62, 12], [156, 62, 2], [158, 62, 2], [160, 62, 4], [164, 71, 4], [168, 69, 4], [172, 67, 4], [176, 64, 12], [188, 64, 4], [192, 64, 4], [196, 72, 4], [200, 71, 4], [204, 69, 4], [208, 74, 4], [212, 74, 4], [216, 74, 4], [220, 74, 4], [224, 76, 4], [228, 74, 4], [232, 72, 4], [236, 69, 4], [240, 67, 8], [248, 74, 8], [256, 71, 4], [260, 71, 4], [264, 71, 8], [272, 71, 4], [276, 71, 4], [280, 71, 8], [288, 71, 4], [292, 74, 4], [296, 67, 6], [302, 69, 2], [304, 71, 16], [320, 72, 4], [324, 72, 4], [328, 72, 6], [334, 72, 2], [336, 72, 4], [340, 71, 4], [344, 71, 4], [348, 71, 2], [350, 71, 2], [352, 71, 4], [356, 69, 4], [360, 69, 4], [364, 71, 4], [368, 69, 8], [376, 74, 8], [384, 71, 4], [388, 71, 4], [392, 71, 8], [400, 71, 4], [404, 71, 4], [408, 71, 8], [416, 71, 4], [420, 74, 4], [424, 67, 6], [430, 69, 2], [432, 71, 16], [448, 72, 4], [452, 72, 4], [456, 72, 6], [462, 72, 2], [464, 72, 4], [468, 71, 4], [472, 71, 4], [476, 71, 2], [478, 71, 2], [480, 74, 4], [484, 74, 4], [488, 72, 4], [492, 69, 4], [496, 67, 16]]},
+  carol_wish:{build:true,carol:true,keepFlow:true,songName:"위 위시 유 어 메리 크리스마스",sb:12,six8:false,len:204,Tmin:0.4,gain:2.0,
+    bpmFn:T=>G.phase==='flow'?150+14*Math.min(3,G.hurry||0):132+16*T,
+    chords:[[67, 71, 74], [67, 71, 74], [60, 64, 67], [69, 73, 76, 79], [62, 66, 69], [67, 71, 74], [60, 64, 67], [62, 66, 69], [67, 71, 74], [67, 71, 74], [60, 64, 67], [69, 73, 76, 79], [62, 66, 69], [67, 71, 74], [60, 64, 67], [62, 66, 69], [67, 71, 74]],
+    lead:[[8, 62, 4], [12, 67, 4], [16, 67, 2], [18, 69, 2], [20, 67, 2], [22, 66, 2], [24, 64, 4], [28, 64, 4], [32, 64, 4], [36, 69, 4], [40, 69, 2], [42, 71, 2], [44, 69, 2], [46, 67, 2], [48, 66, 4], [52, 62, 4], [56, 62, 4], [60, 71, 4], [64, 71, 2], [66, 72, 2], [68, 71, 2], [70, 69, 2], [72, 67, 4], [76, 64, 4], [80, 62, 2], [82, 62, 2], [84, 64, 4], [88, 69, 4], [92, 66, 4], [96, 67, 8], [104, 62, 4], [108, 67, 4], [112, 67, 2], [114, 69, 2], [116, 67, 2], [118, 66, 2], [120, 64, 4], [124, 64, 4], [128, 64, 4], [132, 69, 4], [136, 69, 2], [138, 71, 2], [140, 69, 2], [142, 67, 2], [144, 66, 4], [148, 62, 4], [152, 62, 4], [156, 71, 4], [160, 71, 2], [162, 72, 2], [164, 71, 2], [166, 69, 2], [168, 67, 4], [172, 64, 4], [176, 62, 2], [178, 62, 2], [180, 64, 4], [184, 69, 4], [188, 66, 4], [192, 67, 12]]},
+  carol_deck:{build:true,carol:true,keepFlow:true,songName:"탄일 캐롤",sb:16,six8:false,len:256,Tmin:0.4,gain:2.0,
+    bpmFn:T=>G.phase==='flow'?134+12*Math.min(3,G.hurry||0):116+12*T,
+    chords:[[67, 71, 74], [67, 71, 74], [67, 71, 74], [67, 71, 74], [67, 71, 74], [67, 71, 74], [67, 71, 74], [67, 71, 74], [62, 66, 69, 72], [67, 71, 74], [67, 71, 74], [62, 66, 69], [67, 71, 74], [67, 71, 74], [67, 71, 74], [67, 71, 74]],
+    lead:[[0, 74, 6], [6, 72, 2], [8, 71, 4], [12, 69, 4], [16, 67, 4], [20, 69, 4], [24, 71, 4], [28, 67, 4], [32, 69, 2], [34, 71, 2], [36, 72, 2], [38, 69, 2], [40, 71, 6], [46, 69, 2], [48, 67, 4], [52, 66, 4], [56, 67, 8], [64, 74, 6], [70, 72, 2], [72, 71, 4], [76, 69, 4], [80, 67, 4], [84, 69, 4], [88, 71, 4], [92, 67, 4], [96, 69, 2], [98, 71, 2], [100, 72, 2], [102, 69, 2], [104, 71, 6], [110, 69, 2], [112, 67, 4], [116, 66, 4], [120, 67, 8], [128, 69, 6], [134, 71, 2], [136, 72, 4], [140, 69, 4], [144, 71, 6], [150, 72, 2], [152, 74, 4], [156, 69, 4], [160, 71, 2], [162, 73, 2], [164, 74, 4], [168, 76, 2], [170, 78, 2], [172, 79, 4], [176, 78, 4], [180, 76, 4], [184, 74, 8], [192, 74, 6], [198, 72, 2], [200, 71, 4], [204, 69, 4], [208, 67, 4], [212, 69, 4], [216, 71, 4], [220, 67, 4], [224, 69, 2], [226, 71, 2], [228, 72, 2], [230, 69, 2], [232, 71, 6], [238, 69, 2], [240, 67, 4], [244, 66, 4], [248, 67, 8]]},
+  carol_hark:{build:true,carol:true,keepFlow:true,songName:"천사 찬송하기를",sb:16,six8:false,len:320,Tmin:0.4,gain:2.0,
+    bpmFn:T=>G.phase==='flow'?128+12*Math.min(3,G.hurry||0):108+12*T,
+    chords:[[67, 71, 74], [67, 71, 74], [62, 66, 69, 72], [67, 71, 74], [67, 71, 74], [67, 71, 74], [62, 66, 69], [62, 66, 69], [67, 71, 74], [67, 71, 74], [67, 71, 74], [67, 71, 74], [60, 64, 67], [60, 64, 67], [62, 66, 69], [67, 71, 74], [60, 64, 67], [60, 64, 67], [62, 66, 69], [67, 71, 74]],
+    lead:[[0, 62, 4], [4, 67, 4], [8, 67, 6], [14, 66, 2], [16, 67, 4], [20, 71, 4], [24, 71, 4], [28, 69, 4], [32, 74, 4], [36, 74, 4], [40, 74, 6], [46, 72, 2], [48, 71, 4], [52, 69, 4], [56, 71, 8], [64, 62, 4], [68, 67, 4], [72, 67, 6], [78, 66, 2], [80, 67, 4], [84, 71, 4], [88, 71, 4], [92, 69, 4], [96, 74, 4], [100, 69, 4], [104, 69, 6], [110, 66, 2], [112, 66, 4], [116, 64, 4], [120, 62, 8], [128, 74, 4], [132, 74, 4], [136, 74, 4], [140, 67, 4], [144, 72, 4], [148, 71, 4], [152, 71, 4], [156, 69, 4], [160, 74, 4], [164, 74, 4], [168, 74, 4], [172, 67, 4], [176, 72, 4], [180, 71, 4], [184, 71, 4], [188, 69, 4], [192, 76, 4], [196, 76, 4], [200, 76, 4], [204, 74, 4], [208, 72, 4], [212, 71, 4], [216, 72, 8], [224, 69, 4], [228, 71, 2], [230, 72, 2], [232, 74, 6], [238, 67, 2], [240, 67, 4], [244, 69, 4], [248, 71, 8], [256, 76, 4], [260, 76, 4], [264, 76, 4], [268, 74, 4], [272, 72, 4], [276, 71, 4], [280, 72, 8], [288, 69, 4], [292, 71, 2], [294, 72, 2], [296, 74, 6], [302, 67, 2], [304, 67, 4], [308, 69, 4], [312, 67, 8]]},
+  carol_king:{build:true,carol:true,keepFlow:true,songName:"착한 왕 벤체슬라스",sb:16,six8:false,len:272,Tmin:0.4,gain:2.0,
+    bpmFn:T=>G.phase==='flow'?136+12*Math.min(3,G.hurry||0):116+12*T,
+    chords:[[67, 71, 74], [67, 71, 74], [69, 72, 76], [67, 71, 74], [67, 71, 74], [67, 71, 74], [69, 72, 76], [67, 71, 74], [62, 66, 69], [67, 71, 74], [69, 72, 76], [67, 71, 74], [62, 66, 69], [69, 73, 76, 79], [62, 66, 69], [60, 64, 67], [67, 71, 74]],
+    lead:[[0, 67, 4], [4, 67, 4], [8, 67, 4], [12, 69, 4], [16, 67, 4], [20, 67, 4], [24, 62, 8], [32, 64, 4], [36, 62, 4], [40, 64, 4], [44, 66, 4], [48, 67, 8], [56, 67, 8], [64, 67, 4], [68, 67, 4], [72, 67, 4], [76, 69, 4], [80, 67, 4], [84, 67, 4], [88, 62, 8], [96, 64, 4], [100, 62, 4], [104, 64, 4], [108, 66, 4], [112, 67, 8], [120, 67, 8], [128, 74, 4], [132, 72, 4], [136, 71, 4], [140, 69, 4], [144, 71, 4], [148, 69, 4], [152, 67, 8], [160, 64, 4], [164, 62, 4], [168, 64, 4], [172, 66, 4], [176, 67, 8], [184, 67, 8], [192, 62, 4], [196, 62, 4], [200, 64, 4], [204, 66, 4], [208, 67, 4], [212, 67, 4], [216, 69, 8], [224, 74, 4], [228, 72, 4], [232, 71, 4], [236, 69, 4], [240, 67, 8], [248, 72, 8], [256, 67, 16]]},
+  carol_silent:{build:true,carol:true,keepFlow:true,songName:"고요한 밤",sb:12,six8:true,len:288,Tmin:0.4,gain:2.0,
+    bpmFn:T=>G.phase==='flow'?120+12*Math.min(3,G.hurry||0):96+10*T,
+    chords:[[60, 64, 67], [60, 64, 67], [60, 64, 67], [60, 64, 67], [67, 71, 74], [67, 71, 74], [60, 64, 67], [60, 64, 67], [65, 69, 72], [65, 69, 72], [60, 64, 67], [60, 64, 67], [65, 69, 72], [65, 69, 72], [60, 64, 67], [60, 64, 67], [67, 71, 74], [67, 71, 74, 77], [60, 64, 67], [60, 64, 67], [60, 64, 67], [67, 71, 74, 77], [60, 64, 67], [60, 64, 67]],
+    lead:[[0, 67, 6], [6, 69, 2], [8, 67, 4], [12, 64, 12], [24, 67, 6], [30, 69, 2], [32, 67, 4], [36, 64, 12], [48, 74, 8], [56, 74, 4], [60, 71, 12], [72, 72, 8], [80, 72, 4], [84, 67, 12], [96, 69, 8], [104, 69, 4], [108, 72, 6], [114, 71, 2], [116, 69, 4], [120, 67, 6], [126, 69, 2], [128, 67, 4], [132, 64, 12], [144, 69, 8], [152, 69, 4], [156, 72, 6], [162, 71, 2], [164, 69, 4], [168, 67, 6], [174, 69, 2], [176, 67, 4], [180, 64, 12], [192, 74, 8], [200, 74, 4], [204, 77, 6], [210, 74, 2], [212, 71, 4], [216, 72, 12], [228, 76, 12], [240, 72, 6], [246, 67, 2], [248, 64, 4], [252, 67, 6], [258, 65, 2], [260, 62, 4], [264, 60, 12], [276, 60, 12]]},
   carolWin:{carol:true,shout:true,win:true,len:128,bpm:152,T:0.85,gain:1.8,chords:CAROL_CH.slice(24,32).map(k=>CH[k]),lead:jzLead(CAROL_C.slice(8))},
   title:{bpm:118,T:0.5, // F장조 (F-C-Dm-Bb)
     chords:[[65,69,72],[60,64,67],[62,65,69],[58,62,65]],
@@ -650,36 +676,44 @@ const AU={c:null,mode:'title',step:0,next:0,T:0.3,tr:0,loops:0,
   bump(){this.tone(150,0.08,'square',0.07,90);},
   // ===== 시우 산타: 캐롤 메들리 (썰매방울·글로켄·현악·금관·팀파니) =====
   carolStep(i,t,pat,st,T){
-    const s=i%16,bar=i>>4,ch=pat.chords[bar%pat.chords.length],nch=pat.chords[(bar+1)%pat.chords.length],sec=pat.shout?1:Math.floor(bar/16);
+    const SB=pat.sb||16,s=i%SB,bar=Math.floor(i/SB),ch=pat.chords[bar%pat.chords.length],nch=pat.chords[(bar+1)%pat.chords.length],nb=Math.floor((pat.len||SB*16)/SB),sec=pat.shout?1:Math.floor(bar*3/nb);
+    const w3=SB===12&&!pat.six8,w68=SB===12&&pat.six8,beat=w3?s%4===0:w68?s%6===0:s%4===0,down=s===0;
     if(i===0){if(this.jStarted)this.jloop++;this.jStarted=true;}
     const flow=!pat.shout&&G.screen==='play'&&G.phase==='flow',hz=Math.min(liteMode()?2:9,pat.shout?3:flow?1+Math.min(3,G.hurry||0):(T>0.75?1:0)),lp=pat.shout?0:this.jloop%2;
-    // 썰매 방울: 8분음표 "찰랑", 박에 강세 (물 흐르면 16분)
-    if(s%2===0||(hz>=2&&!liteMode()))this.sleighBell(t,(s%4===0?0.045:0.028)*(hz>=2&&s%2?0.7:1),ch);
-    // 북: 1·3박 킥, 2·4박 스네어, 구간 끝 팀파니
-    if(s===0||s===8)this.kick(t,0.32+0.05*hz);
-    if(s===4||s===12)this.snare(t,0.16+0.04*hz);
-    if(bar%8===7&&s>=8&&s%2===0)this.boom(t,0.22+0.05*(s-8)/2);
-    if(i%128===0&&(i>0||pat.shout))this.crash(t,ch);
-    // 베이스: 근음-5도 "쿵 짝"
-    if(s%8===0)this.ubass(mf(ch[0]-24+(s===8?7:0)),st*3.5,t,0.24);
-    if(s%8===4&&hz>=1)this.ubass(mf(ch[0]-12),st*1.6,t,0.12);
-    // 반주: 엇박 피아노 화음 + 현악 패드(마디마다)
-    if(s%8===4)for(const n of ch)this.jpiano(mf(n),t,0.035,st*2);
-    if(s===0)for(const n of ch)this.pad(mf(n),st*16,t,0.5+0.4*T);
-    // 첼레스타 아르페지오 (8분 → 고조되면 16분)
-    if(T>=0.5&&(s%2===0||(hz>=2&&!liteMode()))){const ar=[0,1,2,1][(s>>1)%4];this.glock(mf(ch[ar]+24),st*1.2,t,0.03+0.01*hz);}
+    // 썰매 방울: 8분음표 "딸랑", 박에 강세 (물 흐르면 16분)
+    if(s%2===0||(hz>=2&&!liteMode()))this.sleighBell(t,(beat?0.045:0.028)*(hz>=2&&s%2?0.7:1)*(w68&&!flow?0.7:1),ch);
+    // 북
+    if(SB===16){if(s===0||s===8)this.kick(t,0.32+0.05*hz);if(s===4||s===12)this.snare(t,0.16+0.04*hz);}
+    else if(w3){if(s===0)this.kick(t,0.32+0.05*hz);if(hz>=1&&(s===4||s===8))this.snare(t,0.1+0.04*hz);}
+    else{if(s===0||(hz>=1&&s===6))this.kick(t,(s?0.2:0.28)+0.05*hz);if(hz>=2&&s===6)this.snare(t,0.12);}
+    if(bar%8===7&&s>=SB/2&&s%2===0)this.boom(t,0.22+0.05*(s-SB/2)/2);
+    if(i%(SB*8)===0&&(i>0||pat.shout))this.crash(t,ch);
+    // 베이스
+    if(SB===16){if(s%8===0)this.ubass(mf(ch[0]-24+(s===8?7:0)),st*3.5,t,0.24);if(s%8===4&&hz>=1)this.ubass(mf(ch[0]-12),st*1.6,t,0.12);}
+    else if(w3){if(s===0)this.ubass(mf(ch[0]-24),st*3.5,t,0.24);}
+    else{if(s===0||s===6)this.ubass(mf(ch[0]-24+(s===6?7:0)),st*4.5,t,0.22);}
+    // 반주: 피아노(4/4 엇박, 3/4 쿵-짝-짝, 6/8 펼침화음) + 현악 패드
+    if(SB===16){if(s%8===4)for(const n of ch)this.jpiano(mf(n),t,0.035,st*2);}
+    else if(w3){if(s===4||s===8)for(const n of ch)this.jpiano(mf(n),t,0.04,st*2.5);}
+    else if(s%2===0){const ar=[0,1,2,1,2,1][(s>>1)%6];this.jpiano(mf(ch[ar]+12),t,0.045,st*3);}
+    if(down)for(const n of ch)this.pad(mf(n),st*SB,t,0.5+0.4*T);
+    // 첼레스타 아르페지오
+    if(T>=0.5&&!w68&&(s%2===0||(hz>=2&&!liteMode()))){const ar=[0,1,2,1][(s>>1)%4];this.glock(mf(ch[ar]+24),st*1.2,t,0.03+0.01*hz);}
     // 금관: 물 흐르면 마디 첫 박 "빠밤!"
-    if(hz>=2&&(s===0||(hz>=3&&s===10)))for(const n of ch)this.brass(mf(n),st*(s===0?3:1.5),t,0.02+0.006*hz);
-    if(hz>=2&&i%128===112)this.riser(st*16,t,0.05+0.015*hz);
-    // 멜로디: 구간·바퀴마다 악기를 바꿈
+    if(hz>=2&&(down||(hz>=3&&s===SB-6)))for(const n of ch)this.brass(mf(n),st*(down?3:1.5),t,0.02+0.006*hz);
+    if(hz>=2&&i%(SB*8)===SB*7)this.riser(st*SB,t,0.05+0.015*hz);
+    // 멜로디: 곡의 앞·중간·뒤 구간과 바퀴마다 악기를 바꿈
     const ld=LEAD[this.mode][i];if(!ld)return;const f=mf(ld[0]),d=st*ld[1];
     if(pat.shout){this.brass(f,d*0.9,t,0.08);this.glock(f*2,d,t,0.06);return;}
-    const v=sec===0?(lp?'strings':'glock'):sec===1?'bells':(lp?'glock':'strings');
+    const v=w68?(lp?'strings':'musicbox'):sec===0?(lp?'strings':'glock'):sec===1?'bells':(lp?'glock':'strings');
     if(v==='glock'){this.glock(f*2,d,t,0.11);this.recorder(f,d*0.92,t,0.05);}
     else if(v==='bells'){this.glock(f*2,d,t,0.12);this.brass(f,d*0.9,t,0.045);}
+    else if(v==='musicbox'){this.glock(f*2,d,t,0.12);this.bell(f*2,t,0.03);}
     else{this.strings(f,d*0.98,t,0.06);this.glock(f*2,d,t,0.05);}
-    if(hz>=1&&sec===1)this.brass(f/2,d*0.85,t,0.03);
+    if(hz>=1&&sec===1&&!w68)this.brass(f/2,d*0.85,t,0.03);
+    if(hz>=1&&w68)this.strings(f/2,d*0.95,t,0.035);
   },
+
   sleighBell(t,v,ch){ // 썰매 방울 '딸랑': 지금 화음의 높은 음 3개를 짧게 (잡음 없이, 키에 맞게)
     const c=this.c,g=c.createGain(),ns=this.tonesAt(98,ch);g.gain.setValueAtTime(0.0001,t);g.gain.exponentialRampToValueAtTime(v,t+0.004);g.gain.exponentialRampToValueAtTime(0.0001,t+0.14);
     for(const f of (liteMode()?ns.slice(0,2):ns.slice(0,3)).map(mf)){const o=this.osc('sine',f*(1+Math.random()*0.01),t,0);o.connect(g);o.start(t);o.stop(t+0.13);}
@@ -824,7 +858,7 @@ const AU={c:null,mode:'title',step:0,next:0,T:0.3,tr:0,loops:0,
   hug(){if(!this.c)return;const t=this.c.currentTime;this.tonesAt(72).slice(0,4).forEach((n,k)=>this.vibes(mf(n),t+k*0.08,0.08));},
   // 지금 흐르는 배경음악의 화음 (효과음도 같은 키로 맞추기 위해)
   chordNow(){const p=this.mode&&MUS[this.mode];if(!p)return this.lastChord||[60,64,67];const L=p.len||64,i=this.curStep!=null?this.curStep%L:this.step;
-    let ch;if(p.jazz){const f=p.shout?JZ_SHOUT:JZ_FORM,c=JC[f[(i>>3)%f.length]];ch=c.q.slice(0,3).map(q=>c.r+q);}else ch=p.chords[(i>>4)%p.chords.length].map(n=>n+(p.build?this.tr:0));
+    let ch;if(p.jazz){const f=p.shout?JZ_SHOUT:JZ_FORM,c=JC[f[(i>>3)%f.length]];ch=c.q.slice(0,3).map(q=>c.r+q);}else ch=p.chords[Math.floor(i/(p.sb||16))%p.chords.length].map(n=>n+(p.build?this.tr:0));
     return this.lastChord=ch;},
   tonesAt(base,ch){const pcs=[...new Set((ch||this.chordNow()).map(n=>((n%12)+12)%12))],out=[];
     for(let o=-1;o<4;o++)for(const pc of pcs){const n=Math.floor(base/12)*12+pc+o*12;if(n>=base)out.push(n);}return out.sort((a,b)=>a-b);},
@@ -2694,9 +2728,9 @@ const CONCEPTS=[
    scene:makeDadScene()},
   {id:'santa',icon:'🎅',name:'시우 산타 출동!',desc:'카피바라 마을에 선물 배달',color:'#e8383a',locked:false,
    pipe:{rim:'#5a0e12',dark:'#a8202a',body:'#f4f4f4',hi:'#ffffff',channel:'#d8262d',flange:'#2e9a4a',water:'#ffe066',waterHi:'#ffffff'},
-   tileA:'#1c2a4a',tileB:'#182442',frame:'#e8383a',startLabel:'썰매',goalLabel:'트리',capyOutfit:'santa',music:'carol',winMusic:'carolWin',rock:'snowman',
+   tileA:'#1c2a4a',tileB:'#182442',frame:'#e8383a',startLabel:'썰매',goalLabel:'트리',capyOutfit:'santa',music:'carol_jingle',musicFor:n=>'carol_'+SANTA_SONGS[(n-1)%SANTA_SONGS.length],winMusic:'carolWin',rock:'snowman',
    startCol:['#ff8a8a','#b81a2a'],goalFill:'#e8fff0',goalStroke:'#2e9a4a',goalText:'#0e5a1a',goalIcon:'🎄',
-   keyRule:true,keyMin:2,keyIcon:'🎁',keyName:'선물 배달',keyCol:'#ffd23a',keyItems:santaItems,keyLine:n=>`🎁 친구 ${n}명에게 선물 배달: ${(G.keyList||[]).map(i=>i.icon).join(' ')}`,keySfx:()=>AU.giftDrop(),headCar:'sleigh',
+   keyRule:true,keyMin:2,keyIcon:'🎁',keyName:'선물 배달',keyCol:'#ffd23a',keyItems:santaItems,keyLine:n=>`🎁 친구 ${n}명에게 선물 배달: ${(G.keyList||[]).map(i=>i.icon).join(' ')}\n🎵 캐롤: ${MUS['carol_'+SANTA_SONGS[(G.level-1)%SANTA_SONGS.length]].songName}`,keySfx:()=>AU.giftDrop(),headCar:'sleigh',
    countLabel:'썰매 출발까지',sendLabel:'🛷 출발',pathWord:'썰매길',fluidSubj:'썰매가',
    introShort:'🎄 카피바라 친구들이 선물을 기다려요!',goBtn:'🛷 출발!',startSfx:()=>AU.sleighStart(),
    winTitle:'🎄 메리 크리스마스!',winLine:'친구들이 모두 선물을 받았어요!',loseTitle:'❄ 앗! 썰매길이 끊겼어요',loseLine:'친구들이 기다려요, 다시!',
@@ -2811,7 +2845,7 @@ function startLevel(n,retry){
   G.queue=[];for(let i=0;i<5;i++)G.queue.push(newPiece());
   Object.assign(G,{announce:null,conn:[],connN:0,connPop:0,connReached:false,keyPassed:0,hot:false,crossCells:[],tallyList:[],tallyIdx:0,ttabongT:-1,oneWayPassed:0,flowT:0,hurry:0,hurryShow:0,crosses:0,crossReq:cfg.crossReq||0,phase:'ready',countdown:cfg.countdown,tileTime:cfg.tileTime,flow:null,fast:false,elapsed:0,replaces:0,pathLen:0,resultT:0,fx:[],floats:[],qShift:0,lock:0,lockMax:1,pending:[],lastTick:99,stars:0});
   G.dangerT=Math.min(cfg.countdown,90)+cfg.tileTime*(cfg.minDist+4);
-  G.concept.scene.reset();AU.setMusic(G.concept.music||'play');
+  G.concept.scene.reset();AU.setMusic(G.concept.musicFor?G.concept.musicFor(n):(G.concept.music||'play'));
 }
 function selectConcept(cp,lvl){G.concept=cp;G.screen='play';G.score=0;spriteCache={};startLevel(lvl);}
 function goHome(){G.screen='title';G.confirm=null;G.floats=[];G.fx=[];AU.setMusic('title');}
