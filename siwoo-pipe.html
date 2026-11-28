@@ -61,7 +61,7 @@ function wrap(text,maxW,size,font){
 }
 
 /* ================= 저장 ================= */
-const APP_VER='v1.56 · 2026.11.28'; // 배포할 때마다 올림
+const APP_VER='v1.57 · 2026.11.28'; // 배포할 때마다 올림
 const STORE_KEY='siwoo-pipe-v1';
 function loadSave(){try{return JSON.parse(localStorage.getItem(STORE_KEY))||{};}catch(e){return {};}}
 function saveSave(){try{localStorage.setItem(STORE_KEY,JSON.stringify(SAVE));}catch(e){}}
@@ -83,6 +83,10 @@ const JC={F:{r:41,v:[57,62,64,67],q:[0,4,7,9]},D7:{r:38,v:[54,57,60,64],q:[0,4,7
 // 반 마디마다 화음 (16마디 = 32칸): A(1-4) A'(5-8) B(9-12) A''(13-16)
 const JZ_FORM=['F','F','D7','D7','Gm','Gm','C7','C7', 'Am','D7','Gm','C7','F','D7','Gm','C7', 'Bb','Bb','Bbm','Eb7','Am','Am','D7','D7', 'Gm','Gm','C7','C7','F','D7','Gm','C7'];
 const JZ_SHOUT=['F','D7','Gm','C7','F','D7','Gm','C7'];
+// 피아니스트 시우: C장조 16마디 AABA 스윙 "시우 스윙" (이 게임을 위해 새로 지은 곡)
+Object.assign(JC,{C6:{r:36,v:[52,57,60,64],q:[0,4,7,9]},A7:{r:45,v:[55,61,64,66],q:[0,4,7,10]},Dm7:{r:38,v:[53,57,60,64],q:[0,3,7,10]},G7:{r:43,v:[53,57,59,64],q:[0,4,7,10]},
+  F6:{r:41,v:[53,57,62,64],q:[0,4,7,9]},Fm6:{r:41,v:[53,56,60,62],q:[0,3,7,9]},Em7:{r:40,v:[50,55,59,62],q:[0,3,7,10]}});
+const PJ_FORM=['C6','C6','A7','A7','Dm7','Dm7','G7','G7', 'C6','C6','A7','A7','Dm7','G7','C6','G7', 'F6','F6','Fm6','Fm6','Em7','A7','D7','G7', 'C6','C6','A7','A7','Dm7','G7','C6','C6'];
 const JCOMP=[[0,6],[4,12],[2,8],[0,10],[6,14],[4,10],[0,6,12]];
 function jzLead(bars){const out=[];bars.forEach((b,k)=>{for(const [s,n,l,g] of b)out.push([k*16+s,n,l,g]);});return out;}
 /* 캐롤 메들리 48마디: ① 썰매 노래 절(16) ② 썰매 노래 후렴(16) ③ 탄일 캐롤(16) */
@@ -200,6 +204,26 @@ const MUS={
     bpmFn:T=>G.phase==='flow'?120+12*Math.min(3,G.hurry||0):96+10*T,
     chords:[[60, 64, 67], [60, 64, 67], [60, 64, 67], [60, 64, 67], [67, 71, 74], [67, 71, 74], [60, 64, 67], [60, 64, 67], [65, 69, 72], [65, 69, 72], [60, 64, 67], [60, 64, 67], [65, 69, 72], [65, 69, 72], [60, 64, 67], [60, 64, 67], [67, 71, 74], [67, 71, 74, 77], [60, 64, 67], [60, 64, 67], [60, 64, 67], [67, 71, 74, 77], [60, 64, 67], [60, 64, 67]],
     lead:[[0, 67, 6], [6, 69, 2], [8, 67, 4], [12, 64, 12], [24, 67, 6], [30, 69, 2], [32, 67, 4], [36, 64, 12], [48, 74, 8], [56, 74, 4], [60, 71, 12], [72, 72, 8], [80, 72, 4], [84, 67, 12], [96, 69, 8], [104, 69, 4], [108, 72, 6], [114, 71, 2], [116, 69, 4], [120, 67, 6], [126, 69, 2], [128, 67, 4], [132, 64, 12], [144, 69, 8], [152, 69, 4], [156, 72, 6], [162, 71, 2], [164, 69, 4], [168, 67, 6], [174, 69, 2], [176, 67, 4], [180, 64, 12], [192, 74, 8], [200, 74, 4], [204, 77, 6], [210, 74, 2], [212, 71, 4], [216, 72, 12], [228, 76, 12], [240, 72, 6], [246, 67, 2], [248, 64, 4], [252, 67, 6], [258, 65, 2], [260, 62, 4], [264, 60, 12], [276, 60, 12]]},
+  pianoJazz:{build:true,jazz:true,inst:'piano',form:PJ_FORM,keepFlow:true,len:256,Tmin:0.35,gain:2.1,
+    bpmFn:T=>G.phase==='flow'?132+12*Math.min(3,G.hurry||0):108+18*T,
+    lead:jzLead([
+      [[0,67,2],[2,69,2],[4,72,4],[8,76,2],[10,74,2],[12,72,4]],                 // 1 C6   "솔라 도~ 미레 도~"
+      [[0,76,3,75],[4,73,2],[6,69,2],[8,67,2],[10,69,2],[12,73,4]],              // 2 A7
+      [[0,74,2],[2,77,2],[4,81,4],[8,79,2],[10,77,2],[12,74,4]],                 // 3 Dm7  (1마디를 한 층 위에서 반복)
+      [[0,79,3,78],[4,77,2],[6,74,2],[8,71,4],[12,67,4]],                        // 4 G7
+      [[0,67,2],[2,69,2],[4,72,4],[8,76,2],[10,74,2],[12,72,4]],                 // 5 C6
+      [[0,76,3,75],[4,73,2],[6,69,2],[8,67,2],[10,69,2],[12,72,2],[14,73,2]],    // 6 A7
+      [[0,74,2],[2,77,2],[4,81,2],[6,79,2],[8,77,2],[10,74,2],[12,71,4]],        // 7 Dm7 G7
+      [[0,72,4],[4,76,2],[6,79,2],[8,84,4],[12,79,4]],                           // 8 C6 G7
+      [[0,81,2],[2,79,2],[4,77,2],[6,74,2],[8,72,4],[12,69,4]],                  // 9 F6 (브릿지)
+      [[0,80,4,79],[4,77,2],[6,74,2],[8,72,2],[10,68,2],[12,65,4]],              // 10 Fm6
+      [[0,71,2],[2,74,2],[4,79,2],[6,76,2],[8,73,4,72],[12,76,4]],               // 11 Em7 A7
+      [[0,78,2],[2,81,2],[4,78,2],[6,74,2],[8,77,4],[12,71,4]],                  // 12 D7 G7
+      [[0,67,2],[2,69,2],[4,72,4],[8,76,2],[10,74,2],[12,72,4]],                 // 13 C6
+      [[0,76,3,75],[4,73,2],[6,69,2],[8,67,2],[10,69,2],[12,73,4]],              // 14 A7
+      [[0,74,2],[2,77,2],[4,81,4],[8,79,2],[10,77,2],[12,74,2],[14,71,2]],       // 15 Dm7 G7
+      [[0,72,6],[8,67,2],[10,72,2],[12,79,2],[14,72,2]]                          // 16 C6 "빠-밤 빠밤!"
+    ])},
   pianoBg:{build:true,piano:true,keepFlow:true,len:64,Tmin:0.3,gain:3.6,bpm0:80,bpmR:36,bpmFn:T=>G.phase==='flow'?96+14*Math.min(3,G.hurry||0):80+36*T, // 시우의 워밍업 (C-Am-F-G)
     chords:[[60,64,67],[57,60,64],[53,57,60],[55,59,62]],lead:[]},
   pianoWin:{piano:true,pwin:true,win:true,len:128,bpm:138,T:0.8,gain:3.2, // 시우의 성공 행진곡 (이 게임을 위해 새로 지은 곡)
@@ -715,8 +739,12 @@ const AU={c:null,mode:'title',step:0,next:0,T:0.3,tr:0,loops:0,
       const b=sg.bass?sg.bass[k%sg.bass.length]:pianoBass(sg.key,n);const cf=PIANO_CH[sg.key].find(x=>x[0]%12===b%12);G.pChord={root:b,pcs:cf?cf[1]:[b%12,(b+4)%12,(b+7)%12]};
       if(sg.bass||k%2===0)this.jpiano(mf(b),t,0.09,1.2);
       if(isX){const r=b+12,mj=PIANO_CH[sg.key].find(x=>x[0]%12===b%12),q=mj?mj[1]:[0,4,7];for(const pc of q){let m2=r;while(m2%12!==pc)m2++;this.jpiano(mf(m2),t+0.02,0.07,1.4);}}});},
-  pianoFlourish(){if(!this.c)return;const t=this.c.currentTime,sg=curPianoSong(),b=pianoBass(sg.key,sg.m[(G.pnIdx||0)%sg.m.length])+24;
-    this.pianoPlay(()=>{[0,4,7,12,16,19,24].forEach((d,j)=>this.jpiano(mf(b+d),t+j*0.05,0.06,0.5));});},
+  // 칸마다: 지금 반주 화음에 맞는 짧은 재즈 건반 "또롱" (반주를 가리지 않게 작고 짧게)
+  pianoTap(isX){if(!this.c)return;const t=this.c.currentTime,k=G.pnIdx||0,ns=this.tonesAt(79);G.pnIdx=k+1;
+    this.pianoPlay(()=>{const a=ns[[0,1,2,1][k%4]],b=ns[[1,2,3,2][k%4]];this.jpiano(mf(a),t,0.08,0.22);this.jpiano(mf(b),t+0.07,0.09,0.35);
+      if(isX)this.tonesAt(67).slice(0,4).forEach((n,j)=>this.jpiano(mf(n),t+0.03+j*0.035,0.04,0.6));});},
+  pianoFlourish(){if(!this.c)return;const t=this.c.currentTime,ns=this.tonesAt(72);
+    this.pianoPlay(()=>{ns.slice(0,7).forEach((n,j)=>this.jpiano(mf(n),t+j*0.045,0.055,0.45));});},
   pianoClash(){if(!this.c)return;const t=this.c.currentTime;this.pianoPlay(()=>{for(const n of [48,49,54,55,60,61])this.jpiano(mf(n),t,0.06,0.9);});},
   pianoWarm(){if(!this.c)return;const t=this.c.currentTime;this.pianoPlay(()=>{[60,64,67,72,76,79,84].forEach((n,j)=>this.jpiano(mf(n),t+j*0.07,0.07,0.6));for(const n of [48,60,64,67])this.jpiano(mf(n),t+0.55,0.06,1.4);});},
   // ===== 시우 산타: 캐롤 메들리 (썰매방울·글로켄·현악·금관·팀파니) =====
@@ -775,7 +803,7 @@ const AU={c:null,mode:'title',step:0,next:0,T:0.3,tr:0,loops:0,
   giftDrop(){if(!this.c)return;const t=this.c.currentTime,ns=this.tonesAt(79);[3,2,1,0].forEach((k,j)=>this.glock(mf(ns[k]),0.3,t+j*0.07,0.13));this.sleighBell(t+0.3,0.08);},
   // ===== 아빠 퇴근길: 재즈 (16마디 AABA, 스윙) =====
   jazzStep(i,t,pat,st,T){
-    const form=pat.shout?JZ_SHOUT:JZ_FORM,s=i%16,bar=i>>4,hb=i>>3,ch=JC[form[hb%form.length]],nch=JC[form[(hb+1)%form.length]];
+    const form=pat.shout?(pat.shoutForm||JZ_SHOUT):(pat.form||JZ_FORM),s=i%16,bar=i>>4,hb=i>>3,ch=JC[form[hb%form.length]],nch=JC[form[(hb+1)%form.length]];
     if(i===0){if(this.jStarted)this.jloop++;this.jStarted=true;}
     const sw=s%4===2?st*0.66:0,tt=t+sw;
     const flow=!pat.shout&&G.screen==='play'&&G.phase==='flow',hz=Math.min(liteMode()?2:9,pat.shout?3:flow?1+Math.min(3,G.hurry||0):(T>0.75?1:0));
@@ -796,12 +824,19 @@ const AU={c:null,mode:'title',step:0,next:0,T:0.3,tr:0,loops:0,
     if(s===0)this.jcomp=JCOMP[ri(JCOMP.length)].concat(hz>=2?[14]:[]);
     if(this.jcomp&&this.jcomp.includes(s)){const cc=s>=14?nch:ch,ln=s%8===0?st*2.6:st*1.3;cc.v.forEach((n,k)=>this.jpiano(mf(n),tt+k*0.006,0.05,ln));}
     // ── 물이 흐르면: 브라스 섹션이 "빠밤!" (HURRY UP마다 더 세게)
-    if(hz>=2&&((s===0&&bar%2===0)||s===6||(hz>=3&&s===14)||(hz>=4&&s===10))){const cc=s>=14?nch:ch;for(const n of cc.v)this.brass(mf(n+12),st*(s===0?2.2:1.1),tt,0.02+0.006*hz);}
-    if(hz>=3&&!pat.shout&&s===8&&bar%2===1){const top=ch.v[3]+12;[[0,top],[2,top+2],[4,top+3]].forEach(([d,n],k)=>this.brass(mf(n),st*(k===2?3:1.2),t+d*st+(d===2?st*0.66:0),0.06));}
+    if(hz>=2&&((s===0&&bar%2===0)||s===6||(hz>=3&&s===14)||(hz>=4&&s===10))){const cc=s>=14?nch:ch;if(pat.inst==='piano'){for(const n of cc.v){this.jpiano(mf(n+12),tt,0.05+0.008*hz,st*1.2);}this.jpiano(mf(cc.v[3]+24),tt,0.05,st*1.2);}else for(const n of cc.v)this.brass(mf(n+12),st*(s===0?2.2:1.1),tt,0.02+0.006*hz);}
+    if(hz>=3&&!pat.shout&&pat.inst!=='piano'&&s===8&&bar%2===1){const top=ch.v[3]+12;[[0,top],[2,top+2],[4,top+3]].forEach(([d,n],k)=>this.brass(mf(n),st*(k===2?3:1.2),t+d*st+(d===2?st*0.66:0),0.06));}
     if(hz>=2&&i%64===48)this.riser(st*16,t,0.05+0.015*hz);
     // ── 멜로디
     const ld=LEAD[this.mode][i];
     if(pat.shout){if(ld){const f=mf(ld[0]);this.brass(f,st*ld[1]*0.9,tt,0.085);this.sax(f/2,st*ld[1]*0.92,tt,0.05);}return;}
+    if(pat.inst==='piano'){
+      const mel=(v)=>{if(!ld)return;const f=mf(ld[0]),d=st*ld[1]*1.05;if(ld[2])this.jpiano(mf(ld[2]),tt-0.035,v*0.5,0.05);this.jpiano(f,tt,v,d);this.jpiano(f/2,tt+0.004,v*0.45,d);};
+      if(lp===0){mel(0.13);if(hz>=2&&ld)this.vibes(mf(ld[0]+12),tt,0.02);}
+      else if(lp===1){if(bar>=12)mel(0.13);else this.pianoSolo(s,bar,tt,st,ch);}
+      else{mel(0.12);if(ld&&ld[1]>=2)for(const n of ch.v)if(n<ld[0]-2&&n>ld[0]-13)this.jpiano(mf(n+12),tt+0.006,0.035,st*ld[1]*0.9);if(ld)this.vibes(mf(ld[0]+12),tt,0.022);}
+      if(bar===15&&s>=8&&s%2===0&&lp!==1){const run=[84,81,79,76];this.vibes(mf(run[(s-8)>>1]),tt,0.035);}
+      return;}
     if(lp===0){ // 1바퀴: 색소폰 주제
       if(ld)this.sax(mf(ld[0]),st*ld[1]*0.92,tt,0.085,ld[2]&&mf(ld[2]));
       if(bar>=12&&ld)this.vibes(mf(ld[0]+12),tt,0.022);
@@ -903,7 +938,7 @@ const AU={c:null,mode:'title',step:0,next:0,T:0.3,tr:0,loops:0,
   hug(){if(!this.c)return;const t=this.c.currentTime;this.tonesAt(72).slice(0,4).forEach((n,k)=>this.vibes(mf(n),t+k*0.08,0.08));},
   // 지금 흐르는 배경음악의 화음 (효과음도 같은 키로 맞추기 위해)
   chordNow(){const p=this.mode&&MUS[this.mode];if(!p)return this.lastChord||[60,64,67];const L=p.len||64,i=this.curStep!=null?this.curStep%L:this.step;
-    let ch;if(p.jazz){const f=p.shout?JZ_SHOUT:JZ_FORM,c=JC[f[(i>>3)%f.length]];ch=c.q.slice(0,3).map(q=>c.r+q);}else ch=p.chords[Math.floor(i/(p.sb||16))%p.chords.length].map(n=>n+(p.build?this.tr:0));
+    let ch;if(p.jazz){const f=p.shout?(p.shoutForm||JZ_SHOUT):(p.form||JZ_FORM),c=JC[f[(i>>3)%f.length]];ch=c.q.slice(0,3).map(q=>c.r+q);}else ch=p.chords[Math.floor(i/(p.sb||16))%p.chords.length].map(n=>n+(p.build?this.tr:0));
     return this.lastChord=ch;},
   tonesAt(base,ch){const pcs=[...new Set((ch||this.chordNow()).map(n=>((n%12)+12)%12))],out=[];
     for(let o=-1;o<4;o++)for(const pc of pcs){const n=Math.floor(base/12)*12+pc+o*12;if(n>=base)out.push(n);}return out.sort((a,b)=>a-b);},
@@ -2789,7 +2824,7 @@ function makePianoScene(){
     c.fillStyle='#f6f4ea';c.fillRect(px-0.035,top+0.008,0.04,0.016);c.fillStyle='#111';for(let q=0;q<3;q++)c.fillRect(px-0.032+q*0.012,top+0.008,0.006,0.008);
     if(playing){c.fillStyle='rgba(255,220,90,0.8)';c.fillRect(px-0.03+(S.hand?0.018:0.006),top+0.008,0.008,0.016);}
     c.fillStyle='#fffbe8';c.save();c.translate(px+0.01,top-0.005);c.rotate(-0.25);c.fillRect(-0.002,-0.05,0.06,0.045);
-    const sg=curPianoSong(),prog=clamp((G.pnIdx||0)/sg.m.length,0,1);c.fillStyle='#c8a030';c.fillRect(0.002,-0.012,0.052*prog,0.004);
+    const prog=AU.mode==='pianoJazz'?((AU.curStep||0)%256)/256:0;c.fillStyle='#c8a030';c.fillRect(0.002,-0.012,0.052*prog,0.004);
     c.fillStyle='#999';for(let q=0;q<4;q++)c.fillRect(0.004,-0.045+q*0.008,0.05,0.0012);c.restore();
     // 의자 + 시우 (나비넥타이 정장)
     const bx=px-0.1*k-0.02,by=g.py+0.045;c.fillStyle='#2a1a10';rr(c,bx-0.04,by-0.012,0.09,0.016,0.004);c.fill();c.fillRect(bx-0.035,by,0.008,0.05);c.fillRect(bx+0.035,by,0.008,0.05);
@@ -2840,7 +2875,7 @@ function makePianoScene(){
       else if(lost)bubble(fx,fy,S.lose<2?'앗, 음이 끊겼다…':'다시 해 볼래요!',fs,rect);
       else if(ph==='flow'&&danger)bubble(fx,fy+Math.sin(t*20)*2,'어? 다음 음이…! 😰',fs,rect);
       else if(ph==='flow'&&S.relief>0)bubble(fx,fy,'휴~ 😮‍💨',fs,rect);
-      else if(ph==='flow')bubble(fx,fy+Math.sin(t*4)*2,(G.hurry||0)>=2?'🔥 열정 연주!':`♪ ${sg.name}`,fs,rect);
+      else if(ph==='flow')bubble(fx,fy+Math.sin(t*4)*2,(G.hurry||0)>=2?'🔥 열정 연주!':'♪ 시우 스윙',fs,rect);
       else{const gul=ph==='countdown'&&isFinite(G.countdown)&&G.countdown<=5;bubble(fx,fy+Math.sin(t*4)*2,gul?'(숨 참는 중…)':urg>0.45?'떨려요… 😣':urg>0.2?'손가락 풀기~':'악보 확인 중 🎼',fs,rect);}}
   };
   return S;
@@ -2944,11 +2979,11 @@ const CONCEPTS=[
    scene:makeSantaScene()},
   {id:'piano',icon:'🎹',name:'피아니스트 시우',desc:'길을 이으면 연주가 돼요',color:'#d4af37',locked:false,
    pipe:{rim:'#0a0a0a',dark:'#1c1c1c',body:'#f6f4ea',hi:'#ffffff',channel:'#2a2a2a',flange:'#d4af37',water:'#ffd84a',waterHi:'#fffbe0'},
-   tileA:'#2a1a2e',tileB:'#24162a',frame:'#d4af37',startLabel:'피아노',goalLabel:'관객',capyOutfit:'pianist',music:'pianoBg',winMusic:'pianoWin',rock:'stand',
+   tileA:'#2a1a2e',tileB:'#24162a',frame:'#d4af37',startLabel:'피아노',goalLabel:'관객',capyOutfit:'pianist',music:'pianoJazz',winMusic:'pianoWin',rock:'stand',
    startCol:['#fff4c0','#9a7a20'],goalFill:'#fff0f6',goalStroke:'#d4af37',goalText:'#6a3a00',goalIcon:'👏',
    keyRule:true,keyIcon:'🎵',keyName:'음표',keyCol:'#ffd84a',keyItems:n=>Array.from({length:n},()=>({icon:'🎵',name:'장식음',kind:'note'})),
-   keyLine:n=>`🎵 음표 칸 ${n}개를 지나가요\n🎹 곡: ${curPianoSong().name}`,keySfx:()=>AU.pianoFlourish(),headCar:'note',
-   onStep:cell=>{if(G.fast)return;const x=cell.t==='X';AU.pianoNext(x);G.concept.scene.onNote(x);},
+   keyLine:n=>`🎵 음표 칸 ${n}개를 지나가요\n🎹 곡: 시우 스윙`,keySfx:()=>AU.pianoFlourish(),headCar:'note',
+   onStep:cell=>{if(G.fast)return;const x=cell.t==='X';AU.pianoTap(x);G.concept.scene.onNote(x);},
    countLabel:'연주 시작까지',sendLabel:'🎹 연주 시작',pathWord:'연주길',fluidSubj:'음악이',
    introShort:'🎹 시우의 피아노 콘서트! 길을 이으면 연주가 돼요',goBtn:'🎹 무대로!',startSfx:()=>AU.pianoWarm(),
    winTitle:'👏 브라보!',winLine:'시우의 연주에 기립박수가 쏟아져요!',loseTitle:'🎹 앗! 음이 끊겼어요',loseLine:'다시 한 번 연주해 봐요!',
