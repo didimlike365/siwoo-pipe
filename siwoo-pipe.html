@@ -61,7 +61,7 @@ function wrap(text,maxW,size,font){
 }
 
 /* ================= 저장 ================= */
-const APP_VER='v1.55 · 2026.11.28'; // 배포할 때마다 올림
+const APP_VER='v1.56 · 2026.11.28'; // 배포할 때마다 올림
 const STORE_KEY='siwoo-pipe-v1';
 function loadSave(){try{return JSON.parse(localStorage.getItem(STORE_KEY))||{};}catch(e){return {};}}
 function saveSave(){try{localStorage.setItem(STORE_KEY,JSON.stringify(SAVE));}catch(e){}}
@@ -200,7 +200,7 @@ const MUS={
     bpmFn:T=>G.phase==='flow'?120+12*Math.min(3,G.hurry||0):96+10*T,
     chords:[[60, 64, 67], [60, 64, 67], [60, 64, 67], [60, 64, 67], [67, 71, 74], [67, 71, 74], [60, 64, 67], [60, 64, 67], [65, 69, 72], [65, 69, 72], [60, 64, 67], [60, 64, 67], [65, 69, 72], [65, 69, 72], [60, 64, 67], [60, 64, 67], [67, 71, 74], [67, 71, 74, 77], [60, 64, 67], [60, 64, 67], [60, 64, 67], [67, 71, 74, 77], [60, 64, 67], [60, 64, 67]],
     lead:[[0, 67, 6], [6, 69, 2], [8, 67, 4], [12, 64, 12], [24, 67, 6], [30, 69, 2], [32, 67, 4], [36, 64, 12], [48, 74, 8], [56, 74, 4], [60, 71, 12], [72, 72, 8], [80, 72, 4], [84, 67, 12], [96, 69, 8], [104, 69, 4], [108, 72, 6], [114, 71, 2], [116, 69, 4], [120, 67, 6], [126, 69, 2], [128, 67, 4], [132, 64, 12], [144, 69, 8], [152, 69, 4], [156, 72, 6], [162, 71, 2], [164, 69, 4], [168, 67, 6], [174, 69, 2], [176, 67, 4], [180, 64, 12], [192, 74, 8], [200, 74, 4], [204, 77, 6], [210, 74, 2], [212, 71, 4], [216, 72, 12], [228, 76, 12], [240, 72, 6], [246, 67, 2], [248, 64, 4], [252, 67, 6], [258, 65, 2], [260, 62, 4], [264, 60, 12], [276, 60, 12]]},
-  pianoBg:{build:true,piano:true,flowSilent:true,len:64,Tmin:0.3,gain:3.6,bpm0:80,bpmR:36, // 시우의 워밍업 (C-Am-F-G)
+  pianoBg:{build:true,piano:true,keepFlow:true,len:64,Tmin:0.3,gain:3.6,bpm0:80,bpmR:36,bpmFn:T=>G.phase==='flow'?96+14*Math.min(3,G.hurry||0):80+36*T, // 시우의 워밍업 (C-Am-F-G)
     chords:[[60,64,67],[57,60,64],[53,57,60],[55,59,62]],lead:[]},
   pianoWin:{piano:true,pwin:true,win:true,len:128,bpm:138,T:0.8,gain:3.2, // 시우의 성공 행진곡 (이 게임을 위해 새로 지은 곡)
     chords:[[60,64,67],[55,59,62,65],[62,65,69],[55,59,62],[53,57,60],[62,65,69],[55,59,62,65],[60,64,67]],
@@ -693,6 +693,16 @@ const AU={c:null,mode:'title',step:0,next:0,T:0.3,tr:0,loops:0,
       if(s%2===0)this.sleighBell?.call(this,t,0.02,ch);
       const ld=LEAD[this.mode][i];if(ld){const f=mf(ld[0]);this.jpiano(f,t,0.13,st*ld[1]);this.jpiano(f/2,t,0.05,st*ld[1]);this.glock(f*2,st*ld[1],t,0.035);}
       return;}
+    if(G.screen==='play'&&G.phase==='flow'&&!G.fast){ // 연주 반주: 시우가 친 음의 화음을 그대로 따라감
+      const pc=G.pChord||{root:48,pcs:[0,4,7]},hz=Math.min(liteMode()?2:3,G.hurry||0),cc=pc.pcs.map(q=>{let m=pc.root+12;while(m%12!==q)m++;return m;});
+      if(s===0||pc!==this.lastPC){this.lastPC=pc;for(const n of cc)this.strings(mf(n),st*(s===0?15:16-s),t,0.016+0.006*hz);}
+      if(s%4===0)this.ubass(mf(pc.root-12+(s===8?7:0)),st*3.2,t,0.10+0.025*hz);
+      if(s%4===2||(hz>=2&&s%2===1))this.jpiano(mf(cc[(s>>1)%cc.length]),t,0.026+0.008*hz,st*1.5);
+      if(hz>=1&&(s===0||s===8))this.kick(t,0.18+0.06*hz);
+      if(hz>=1&&(s===4||s===12))this.ghost(t,0.07+0.03*hz);
+      if(hz>=2&&s%2===0)this.sleighBell(t,0.018,cc);
+      if(hz>=3&&bar%2===1&&s>=12)this.boom(t,0.18);
+      return;}
     // 대기 중: 시우가 손가락을 푸는 아르페지오, 긴장할수록 왼손·현악·빠른 음계가 더해짐
     if(s%2===0){const ar=[0,1,2,1,0,1,2,1][(s>>1)%8],o=(s>=8?12:0);this.jpiano(mf(ch[ar]+12+o),t,(0.05+0.03*T)*(s%4===0?1:0.75),st*2);}
     if(T>=0.45&&(s===0||s===8))this.jpiano(mf(ch[0]-12),t,0.07,st*6);
@@ -702,11 +712,12 @@ const AU={c:null,mode:'title',step:0,next:0,T:0.3,tr:0,loops:0,
   pianoPlay(fn){const m=this.mus;this.mus=this.sfx;try{fn();}finally{this.mus=m;}}, // 연주 소리는 효과음 통로로 (배경음악이 꺼져 있어도 들리게)
   pianoNext(isX){if(!this.c)return;const sg=curPianoSong(),k=G.pnIdx||0,n=sg.m[k%sg.m.length],t=this.c.currentTime;G.pnIdx=k+1;
     this.pianoPlay(()=>{this.jpiano(mf(n),t,0.15,0.9);this.glock(mf(n+12),0.3,t,0.02);
-      const b=sg.bass?sg.bass[k%sg.bass.length]:pianoBass(sg.key,n);
+      const b=sg.bass?sg.bass[k%sg.bass.length]:pianoBass(sg.key,n);const cf=PIANO_CH[sg.key].find(x=>x[0]%12===b%12);G.pChord={root:b,pcs:cf?cf[1]:[b%12,(b+4)%12,(b+7)%12]};
       if(sg.bass||k%2===0)this.jpiano(mf(b),t,0.09,1.2);
       if(isX){const r=b+12,mj=PIANO_CH[sg.key].find(x=>x[0]%12===b%12),q=mj?mj[1]:[0,4,7];for(const pc of q){let m2=r;while(m2%12!==pc)m2++;this.jpiano(mf(m2),t+0.02,0.07,1.4);}}});},
   pianoFlourish(){if(!this.c)return;const t=this.c.currentTime,sg=curPianoSong(),b=pianoBass(sg.key,sg.m[(G.pnIdx||0)%sg.m.length])+24;
     this.pianoPlay(()=>{[0,4,7,12,16,19,24].forEach((d,j)=>this.jpiano(mf(b+d),t+j*0.05,0.06,0.5));});},
+  pianoClash(){if(!this.c)return;const t=this.c.currentTime;this.pianoPlay(()=>{for(const n of [48,49,54,55,60,61])this.jpiano(mf(n),t,0.06,0.9);});},
   pianoWarm(){if(!this.c)return;const t=this.c.currentTime;this.pianoPlay(()=>{[60,64,67,72,76,79,84].forEach((n,j)=>this.jpiano(mf(n),t+j*0.07,0.07,0.6));for(const n of [48,60,64,67])this.jpiano(mf(n),t+0.55,0.06,1.4);});},
   // ===== 시우 산타: 캐롤 메들리 (썰매방울·글로켄·현악·금관·팀파니) =====
   carolStep(i,t,pat,st,T){
@@ -2699,9 +2710,9 @@ function drawMiniNote(x,y,a,s){
 }
 function makePianoScene(){
   const S={A:2,p:[],intensity:0.3,time:0,win:0,lose:0,bg:null,notes:[],hit:-9,hitX:false,hand:0,flowers:[]};
-  S.reset=function(){S.p=[];S.intensity=0.3;S.time=0;S.win=0;S.lose=0;S.bg=null;S.notes=[];S.hit=-9;S.flowers=[];G.pnIdx=0;};
+  S.reset=function(){S.p=[];S.intensity=0.3;S.time=0;S.win=0;S.lose=0;S.bg=null;S.notes=[];S.hit=-9;S.flowers=[];G.pnIdx=0;G.pChord=null;S.danger=false;S.wasDanger=false;S.relief=0;S.clashed=false;S.chordT=0;S.flT=0;S.sparks=[];S.lastAnn=null;S.dangerT=0;};
   S.geom=function(A){const k=clamp(A/2.2,0.55,1);const L=0.46*k+0.08;return {k,floor:0.62,edge:0.82,px:A*0.36,L,py:0.72};};
-  S.onNote=function(isX){S.hit=S.time;S.hitX=isX;S.hand^=1;const g=S.geom(S.A);
+  S.onNote=function(isX){S.hit=S.time;S.hitX=isX;S.hand^=1;if(isX)S.chordT=0.4;const g=S.geom(S.A);
     for(let q=0;q<(isX?3:1);q++)S.notes.push({x:g.px+g.L*0.35+rnd(-0.03,0.06),y:g.py-0.14,vx:rnd(0.03,0.12),vy:rnd(-0.22,-0.14),life:0,max:rnd(1.4,2),ch:['♪','♫','♬','♩'][ri(4)],col:isX?'#ffe14d':['#ffffff','#ffd0f0','#bfe8ff'][ri(3)],sz:isX?0.05:0.038});};
   function buildBg(w,h,A,g){
     const dpr=Math.min(DPR,1.5),cv=document.createElement('canvas');cv.width=Math.max(1,Math.round(w*dpr));cv.height=Math.max(1,Math.round(h*dpr));
@@ -2734,6 +2745,20 @@ function makePianoScene(){
     if(ph==='saving'||ph==='won')S.win+=dt;if(ph==='lost'||ph==='leak')S.lose+=dt;
     if(G.announce&&G.announce.t>0)G.announce.t-=dt;
     for(const n of S.notes){n.life+=dt;n.x+=n.vx*dt;n.y+=n.vy*dt;}S.notes=S.notes.filter(n=>n.life<n.max);
+    // 위기 감지: 물이 곧 들어갈 다음 칸에 맞는 파이프가 없으면 시우가 당황
+    S.danger=false;
+    if(G.phase==='flow'&&G.flow&&!G.fast){const f=G.flow;if(f.to>=0&&f.p>0.2){const nx=nextCell(f.r,f.c,f.to);let ok=false;
+      if(nx){const cl=G.grid[nx[0]][nx[1]],inS=OPP(f.to);
+        if(cl.t==='G')ok=cl.dir===inS;else if(cl.t&&cl.t!=='S'&&cl.t!=='R'){const ex=cl.t==='O'?(inS===OPP(cl.dir)?cl.dir:-1):cl.t==='K'?((inS===OPP(cl.dir)||inS===cl.dir)?1:-1):exitFor(cl.t,inS);ok=ex>=0&&!cl.fills.some(q=>q.from===inS||q.to===inS);}}
+      S.danger=!ok;}}
+    S.dangerT=S.danger?S.dangerT+dt:0;
+    if(S.wasDanger&&!S.danger&&G.phase==='flow')S.relief=1.3;S.wasDanger=S.danger;S.relief=Math.max(0,S.relief-dt);
+    S.chordT=Math.max(0,S.chordT-dt);S.flT=Math.max(0,S.flT-dt);
+    if(G.announce&&G.announce.item&&G.announce!==S.lastAnn){S.lastAnn=G.announce;S.flT=0.7;}
+    if(ph==='leak'&&!S.clashed){S.clashed=true;if(AU.c)AU.pianoClash();}
+    // 열정 모드 불꽃
+    const g0=S.geom(S.A);if(G.phase==='flow'&&(G.hurry||0)>=2&&!S.danger&&Math.random()<dt*9)S.sparks.push({x:g0.px-0.02+rnd(-0.02,0.03),y:g0.py-0.05,vx:rnd(-0.12,0.12),vy:rnd(-0.3,-0.12),life:0,max:rnd(0.4,0.7)});
+    for(const q of S.sparks){q.life+=dt;q.x+=q.vx*dt;q.y+=q.vy*dt;q.vy+=0.5*dt;}S.sparks=S.sparks.filter(q=>q.life<q.max);
     if(ph==='won'&&Math.random()<dt*6)S.p.push({x:rnd(0.1,S.A-0.1),y:-0.02,vx:rnd(-0.05,0.05),vy:rnd(0.2,0.32),life:0,max:4,s:rnd(0.008,0.013),col:['#ffd84a','#ff7ad0','#7ae0ff','#ffffff'][ri(4)],r:Math.random()*6});
     if((ph==='saving'||ph==='won')&&S.win>0.8&&S.flowers.length<10&&Math.random()<dt*4){const g=S.geom(S.A);S.flowers.push({x:rnd(g.px-0.25,g.px+0.35),y:1.0,vy:rnd(-0.75,-0.55),vx:rnd(-0.05,0.05),life:0,land:rnd(0.66,0.78),r:rnd(0,6)});}
     for(const f of S.flowers){f.life+=dt;if(f.y>f.land||f.vy<0){f.vy+=0.9*dt;f.x+=f.vx*dt;f.y+=f.vy*dt;f.r+=dt*5;}if(f.vy>0&&f.y>=f.land){f.y=f.land;f.vy=0;f.vx=0;}}
@@ -2743,6 +2768,7 @@ function makePianoScene(){
     const {x,y,w,h}=rect,A=w/h;S.A=A;const g=S.geom(A),I=S.intensity,t=S.time,ph=G.phase,k=g.k;
     const won=ph==='saving'||ph==='won'||ph==='tally',lost=ph==='lost'||ph==='leak',hide=ph==='tally'||ph==='won';
     const urg=clamp((I-0.3)/0.65,0,1),since=t-S.hit,playing=since<0.35;
+    const rem=G.countdown,gulp=ph==='countdown'&&isFinite(rem)&&rem<=5,nervous=ph==='countdown'&&urg>0.45&&!gulp,passion=ph==='flow'&&!G.fast&&(G.hurry||0)>=2&&!S.danger,danger=S.danger&&S.dangerT>0.15;
     if(!S.bg||S.bg.w!==w||S.bg.h!==h)S.bg=buildBg(w,h,A,g);
     c.drawImage(S.bg.cv,x,y,w,h);
     c.save();c.beginPath();c.rect(x,y,w,h);c.clip();c.translate(x,y);c.scale(h,h);
@@ -2751,7 +2777,7 @@ function makePianoScene(){
     c.save();c.globalCompositeOperation='lighter';c.fillStyle=`rgba(255,240,200,${sp})`;c.beginPath();c.moveTo(g.px-0.04,0);c.lineTo(g.px+0.06,0);c.lineTo(g.px+g.L*0.75,g.py+0.08);c.lineTo(g.px-0.32,g.py+0.08);c.closePath();c.fill();
     c.fillStyle=`rgba(255,240,200,${sp*1.4})`;c.beginPath();c.ellipse(g.px+0.05,g.py+0.08,0.38*k+0.05,0.035,0,0,7);c.fill();c.restore();
     // 그랜드 피아노 (옆모습, 왼쪽이 건반)
-    const px=g.px,L=g.L,top=g.py-0.06,bh=0.05;
+    const px=g.px,L=g.L,top=g.py-0.06-(passion?Math.abs(Math.sin(t*16))*0.004:0),bh=0.05;
     c.fillStyle='#0a0a0e';c.fillRect(px+0.01,top+bh,0.012,0.09);c.fillRect(px+L*0.6,top+bh,0.012,0.09);c.fillRect(px+L*0.92,top+bh,0.012,0.08);
     c.fillStyle='#d4af37';c.fillRect(px+L*0.3,top+bh+0.07,0.03,0.008);
     c.fillStyle='#111116';c.beginPath();c.moveTo(px,top);c.lineTo(px+L*0.55,top);c.quadraticCurveTo(px+L*0.85,top-0.01,px+L,top+0.015);c.lineTo(px+L,top+bh);c.lineTo(px,top+bh);c.closePath();c.fill();
@@ -2772,8 +2798,8 @@ function makePianoScene(){
     for(const f of S.flowers){c.save();c.translate(f.x,f.y);c.rotate(f.r);c.fillStyle='#3a8a4a';c.fillRect(-0.003,0,0.006,0.03);c.fillStyle=['#ff4a6a','#ffd84a','#ff8ad0'][Math.floor(f.r*3)%3];c.beginPath();c.arc(0,0,0.012,0,7);c.fill();c.restore();}
     // 객석: 카피바라 관객들
     const nA=Math.max(6,Math.round(A*5));for(let q=0;q<nA;q++){const ax=(q+0.5)*A/nA,ph2=q*1.7;
-      let ay=0.95+(q%2)*0.03;if(won)ay-=0.04+Math.abs(Math.sin(t*6+ph2))*0.02;else if(playing)ay-=Math.abs(Math.sin(since*12+ph2))*0.006;
-      const as=0.045*k+0.012;c.fillStyle=q%3?'#6a4628':'#7a5430';c.beginPath();c.ellipse(ax,ay,as,as*0.85,0,0,7);c.fill();c.beginPath();c.arc(ax-as*0.6,ay-as*0.75,as*0.22,0,7);c.arc(ax+as*0.6,ay-as*0.75,as*0.22,0,7);c.fill();
+      let ay=0.95+(q%2)*0.03,axo=0;if(won)ay-=0.04+Math.abs(Math.sin(t*6+ph2))*0.02;else if(gulp)ay-=0.012;else if(danger){axo=Math.sin(t*9+ph2)*0.008;ay-=Math.abs(Math.sin(t*5+ph2))*0.008;}else if(passion){axo=Math.sin(t*5+ph2)*0.012;ay-=0.01;}else if(playing)ay-=Math.abs(Math.sin(since*12+ph2))*0.006;
+      const as=0.045*k+0.012,ax2=ax+axo;c.fillStyle=q%3?'#6a4628':'#7a5430';c.beginPath();c.ellipse(ax2,ay,as,as*0.85,0,0,7);c.fill();c.beginPath();c.arc(ax2-as*0.6,ay-as*0.75,as*0.22,0,7);c.arc(ax2+as*0.6,ay-as*0.75,as*0.22,0,7);c.fill();
       if(won){c.fillStyle=q%3?'#6a4628':'#7a5430';for(const sd of [-1,1]){c.save();c.translate(ax+sd*as*0.9,ay+as*0.2);c.rotate(sd*(-0.5+0.35*Math.sin(t*14+ph2)));c.beginPath();c.ellipse(0,-as*0.6,as*0.22,as*0.55,0,0,7);c.fill();c.restore();}}}
     for(const p of S.p){c.save();c.translate(p.x,p.y);c.rotate(p.r);c.fillStyle=p.col;c.fillRect(-p.s,-p.s*0.5,p.s*2,p.s);c.restore();}
     c.restore();
@@ -2785,13 +2811,37 @@ function makePianoScene(){
     const SS=h*(0.075*k+0.012),stand=won&&S.win>0.4;let scx=X(bx+0.005),scy=Y(by)-SS*1.95;
     if(!hide){const bob=playing?-Math.abs(Math.sin(since*18))*SS*0.06:Math.sin(t*(2+3*urg))*SS*0.03;
       if(stand){scy-=SS*0.35;const bow=Math.max(0,Math.sin((S.win-0.4)*2.2));ctx.save();ctx.translate(scx,scy+SS*2);ctx.rotate(bow*0.35);ctx.translate(-scx,-(scy+SS*2));drawBigCapy(scx,scy,SS,'pianist',t,false,true,null);ctx.restore();}
-      else drawBigCapy(scx,scy+bob,SS,'pianist',t,false,false,lost?'sad':(playing||ph==='flow'||ph==='countdown'&&Math.sin(t*(4+6*urg))>0)?(S.hand?'play1':'play0'):null);}
+      else{let pose=null,cheer=false,rot=0,jx=0,scl=1;
+        if(lost){pose='sad';rot=Math.min(1,S.lose*3)*0.45;}                       // 건반에 엎드림
+        else if(ph==='saving')cheer=true;                                         // 마지막 음! 두 손 번쩍
+        else if(gulp){pose='gulp';scl=1+0.035*Math.max(0,Math.sin(t*9));}          // 침 꿀꺽, 가슴이 쿵쿵
+        else if(nervous){pose=Math.sin(t*16)>0?'play0':'play1';jx=Math.sin(t*42)*SS*0.025;} // 손가락 꼼지락 + 다리 달달
+        else if(ph==='flow'){
+          if(S.chordT>0||S.flT>0){cheer=true;rot=S.chordT>0?-0.14:0;}            // 화음 "짠!" / 장식음
+          else if(danger)pose=Math.sin(t*20)>0?'panic0':'panic1';                 // 어? 다음 음이…!
+          else pose=S.hand?'play1':'play0';
+          if(passion)jx=Math.sin(t*10)*SS*0.04;}
+        else if(ph==='countdown'&&Math.sin(t*1.5)>0.6)pose='play0';                // 여유: 가끔 건반 위에 손
+        const fx0=scx+jx,fy0=scy+bob;
+        if(passion){ctx.save();ctx.globalAlpha=0.3;drawBigCapy(fx0+SS*0.06,fy0,SS,'pianist',t,false,false,S.hand?'play0':'play1');ctx.restore();} // 손 잔상
+        ctx.save();ctx.translate(fx0,fy0+SS*2);ctx.rotate(rot);ctx.scale(scl,scl);ctx.translate(-fx0,-(fy0+SS*2));drawBigCapy(fx0,fy0,SS,'pianist',t,false,cheer,pose);ctx.restore();
+        // 땀방울
+        if(nervous||danger||passion||gulp){for(let q=0;q<(danger||passion?3:2);q++){const ph5=(t*(danger?2.4:1.5)+q*0.37)%1,sx=fx0+SS*(q%2?0.72:-0.72)+SS*0.1*q,sy=fy0-SS*0.35+ph5*SS*0.9;
+          ctx.globalAlpha=1-ph5;ctx.fillStyle='#8fd8ff';ctx.beginPath();ctx.moveTo(sx,sy-SS*0.12);ctx.quadraticCurveTo(sx+SS*0.08,sy,sx,sy+SS*0.06);ctx.quadraticCurveTo(sx-SS*0.08,sy,sx,sy-SS*0.12);ctx.fill();ctx.globalAlpha=1;}}
+        if(gulp){txtC('💓',fx0+SS*0.35,fy0+SS*1.05,Math.max(10,SS*0.45),'#fff',{alpha:0.6+0.4*Math.max(0,Math.sin(t*9))});if(rem>4.2)txtC('꿀꺽!',fx0-SS*1.3,fy0+SS*0.3,Math.max(11,SS*0.45),'#ffffff',{font:FT,stroke:'#3a1a3a',sw:4});}
+        if(S.flT>0)txtC('✨😉',fx0+SS*1.2,fy0-SS*0.9,Math.max(12,SS*0.5),'#fff');
+        if(S.chordT>0)txtC('짠!',fx0+SS*1.4,fy0-SS*0.4,Math.max(12,SS*0.6),'#ffe14d',{font:FT,stroke:'#6a3a00',sw:4});
+        if(danger)txtC('웅성웅성…',x+w*0.5,Y(0.88),Math.max(10,h*0.035),'#d8c8e8',{font:FT,stroke:'#120812',sw:3,alpha:0.85});
+        if(gulp)txtC('(조용…)',x+w*0.5,Y(0.88),Math.max(10,h*0.033),'#a898b8',{font:FT});}
+      for(const q of S.sparks)txtC('✨',X(q.x),Y(q.y),Math.max(9,h*0.03),'#fff',{alpha:1-q.life/q.max});}
     S.capyScreen={x:scx,y:scy,size:SS};
     if(!hide){const fx=scx+SS*0.6,fy=scy-SS*1.1,fs=Math.max(11,h*0.042);
       if(won)bubble(fx,fy,S.win>0.4?'감사합니다! 🙇':'짠~! 🎹',fs,rect);
       else if(lost)bubble(fx,fy,S.lose<2?'앗, 음이 끊겼다…':'다시 해 볼래요!',fs,rect);
-      else if(ph==='flow')bubble(fx,fy+Math.sin(t*4)*2,`♪ ${sg.name}`,fs,rect);
-      else bubble(fx,fy+Math.sin(t*4)*2,urg>0.6?'곧 시작해요! 🎹':urg>0.25?'손가락 풀기~':'떨려요…',fs,rect);}
+      else if(ph==='flow'&&danger)bubble(fx,fy+Math.sin(t*20)*2,'어? 다음 음이…! 😰',fs,rect);
+      else if(ph==='flow'&&S.relief>0)bubble(fx,fy,'휴~ 😮‍💨',fs,rect);
+      else if(ph==='flow')bubble(fx,fy+Math.sin(t*4)*2,(G.hurry||0)>=2?'🔥 열정 연주!':`♪ ${sg.name}`,fs,rect);
+      else{const gul=ph==='countdown'&&isFinite(G.countdown)&&G.countdown<=5;bubble(fx,fy+Math.sin(t*4)*2,gul?'(숨 참는 중…)':urg>0.45?'떨려요… 😣':urg>0.2?'손가락 풀기~':'악보 확인 중 🎼',fs,rect);}}
   };
   return S;
 }
@@ -3118,7 +3168,8 @@ function drawBigCapy(cx,cy,S,outfit,t,thumb,cheer,pose){
   // 왼팔(아래)
   const armCol=outfit==='space'||outfit==='doctor'?'#eef2fa':outfit==='fire'?'#e0b020':outfit==='police'?'#1a2a5a':outfit==='driver'?'#1a3a6a':outfit==='dad'?'#2a3550':outfit==='santa'?'#d8262d':outfit==='pianist'?'#16161c':br;
   c.fillStyle=armCol;
-  if(pose==='play0'||pose==='play1'){const up=pose==='play0'?1:-1;for(const [ax,ay,rt] of [[-S*0.6,S*0.95,-1.25+0.12*up],[S*0.55,S*0.95,-1.55-0.12*up]]){c.save();c.translate(ax,ay);c.rotate(rt);c.beginPath();c.ellipse(0,-S*0.42,S*0.18,S*0.48,0,0,7);c.fill();c.restore();}}
+  const PP=pose||'',pArms=/^(play|gulp|panic)/.test(PP),wide=PP==='plead'||PP==='gulp'||PP.startsWith('panic');
+  if(pArms){const up=PP==='gulp'?0:PP.endsWith('0')?1:-1;for(const [ax,ay,rt] of [[-S*0.6,S*0.95,-1.25+0.12*up],[S*0.55,S*0.95,-1.55-0.12*up]]){c.save();c.translate(ax,ay);c.rotate(rt);c.beginPath();c.ellipse(0,-S*0.42,S*0.18,S*0.48,0,0,7);c.fill();c.restore();}}
   else if(pose!=='plead'){c.save();c.translate(-S*0.85,S*1.0);c.rotate(cheer?-0.9:0.35);c.beginPath();c.ellipse(0,S*0.35,S*0.2,S*0.42,0,0,7);c.fill();c.restore();}
   // 머리
   c.fillStyle=br;c.beginPath();c.arc(-S*0.72,-S*0.62,S*0.19,0,7);c.arc(S*0.72,-S*0.62,S*0.19,0,7);c.fill();
@@ -3126,7 +3177,7 @@ function drawBigCapy(cx,cy,S,outfit,t,thumb,cheer,pose){
   c.fillStyle=dk;c.beginPath();c.ellipse(0,S*0.36,S*0.56,S*0.38,0,0,7);c.fill();
   c.fillStyle='#2a1a10';c.beginPath();c.ellipse(-S*0.17,S*0.26,S*0.07,S*0.05,0,0,7);c.ellipse(S*0.17,S*0.26,S*0.07,S*0.05,0,0,7);c.fill();
   c.strokeStyle='#2a1a10';c.lineWidth=Math.max(1.5,S*0.06);c.lineCap='round';
-  if(pose==='plead'){ // 반짝반짝 간절한 눈 + 오므린 입
+  if(wide){ // 동그랗게 뜬 눈 (간절·긴장) + 오므린 입
     for(const ex of [-S*0.4,S*0.4]){c.fillStyle='#2a1a10';c.beginPath();c.ellipse(ex,-S*0.1,S*0.17,S*0.2,0,0,7);c.fill();c.fillStyle='#fff';c.beginPath();c.arc(ex-S*0.06,-S*0.17,S*0.07,0,7);c.fill();c.beginPath();c.arc(ex+S*0.06,-S*0.02,S*0.035,0,7);c.fill();}
     c.fillStyle='#2a1a10';c.beginPath();c.ellipse(0,S*0.5,S*0.07,S*0.06,0,0,7);c.fill();
   }else if(pose==='sad'){
@@ -3165,7 +3216,7 @@ function drawBigCapy(cx,cy,S,outfit,t,thumb,cheer,pose){
   if(outfit==='bobble'){c.fillStyle='#3a7bd5';c.beginPath();c.ellipse(0,-S*0.72,S*0.8,S*0.6,0,Math.PI,0);c.fill();c.fillStyle='#fff';rr(c,-S*0.84,-S*0.8,S*1.68,S*0.2,S*0.1);c.fill();c.beginPath();c.arc(0,-S*1.38,S*0.2,0,7);c.fill();}
   // 오른팔: 따봉
   c.fillStyle=armCol;
-  if(pose==='play0'||pose==='play1'){}
+  if(pArms){}
   else if(pose==='plead'){ // 두 손 모으고 '제발~'
     for(const sd of [-1,1]){c.save();c.translate(sd*S*0.78,S*0.95);c.rotate(sd*0.9);c.beginPath();c.ellipse(0,-S*0.1,S*0.19,S*0.42,0,0,7);c.fill();c.restore();}
     c.fillStyle=br;c.beginPath();c.arc(-S*0.1,S*0.72,S*0.2,0,7);c.arc(S*0.1,S*0.72,S*0.2,0,7);c.fill();c.strokeStyle=dk;c.lineWidth=Math.max(1,S*0.04);c.beginPath();c.moveTo(0,S*0.56);c.lineTo(0,S*0.88);c.stroke();
